@@ -4,11 +4,12 @@ continuity/app.py  ·  Microdrama Continuity Checker Studio
 Enterprise-grade Streamlit dashboard for continuity review.
 
 Tabs
-  1. Human Review Queue  — flag cards with Accept / Reject / Reset
-  2. Visual Analytics   — Severity donut, Entity leaderboard, Arc timeline,
-                          Verdict breakdown bar, Review progress gauge
-  3. Series Bible       — Searchable entity explorer with attribute timeline
-  4. CSV / JSON Exports — Download reviewed data
+  1. Upload & Run Pipeline — Upload your own episode .txt files & run the full pipeline
+  2. Human Review Queue   — Flag cards with Accept / Reject / Reset
+  3. Visual Analytics     — Severity donut, Entity leaderboard, Arc timeline,
+                            Verdict breakdown bar, Review progress gauge
+  4. Series Bible         — Searchable entity explorer with attribute timeline
+  5. CSV / JSON Exports   — Download reviewed data
 
 Persistence: outputs/reviews.json
 Live Precision = accepted / (accepted + rejected)
@@ -18,9 +19,13 @@ import hashlib
 import json
 import logging
 import os
+import re
+import subprocess
+import sys
+import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 import plotly.express as px
@@ -974,6 +979,424 @@ def render_export_tab(df: pd.DataFrame, reviews: Dict) -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Tab 0 — Upload & Run Pipeline
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _run_stage(cmd: List[str], cwd: Path, placeholder) -> Tuple[int, str]:
+    """Run a subprocess stage and stream output into a Streamlit code block."""
+    placeholder.code("⏳ Running…", language="")
+    try:
+        result = subprocess.run(
+            cmd,
+            cwd=str(cwd),
+            capture_output=True,
+            text=True,
+            timeout=300,
+            encoding="utf-8",
+            errors="replace",
+        )
+        output = (result.stdout or "") + (result.stderr or "")
+        placeholder.code(output[-3000:] if len(output) > 3000 else output, language="")
+        return result.returncode, output
+    except subprocess.TimeoutExpired:
+        placeholder.error("⏱ Stage timed out after 5 min.")
+        return -1, "Timeout"
+    except Exception as exc:
+        placeholder.error(f"Error: {exc}")
+        return -1, str(exc)
+
+
+def _episode_number_from_name(name: str) -> Optional[int]:
+    """Extract episode number from a filename like 'episode_007.txt' or 'ep3.txt' or 'Episode 12.txt'."""
+    m = re.search(r"(\d+)", name)
+    return int(m.group(1)) if m else None
+
+
+def render_upload_tab() -> None:
+    st.subheader("📤 Upload Your Episode Files & Run the Pipeline")
+
+    st.markdown("""
+<div style="background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.25);
+     border-radius:12px; padding:16px 20px; margin-bottom:20px;">
+  <strong style="color:#a5b4fc;">How it works</strong>
+  <ol style="color:#cbd5e1; margin:10px 0 0 0; padding-left:18px; font-size:0.92rem; line-height:1.8;">
+    <li>Upload one or more episode <code>.txt</code> screenplay files below.</li>
+    <li>Files are saved to <code>continuity/data/</code> as <code>episode_NNN.txt</code>.</li>
+    <li>Run each pipeline stage in order: <strong>Parse → Extract → Bible → Detect → Judge</strong>.</li>
+    <li>Switch to the other tabs to explore contradictions, visual analytics, and the Series Bible.</li>
+  </ol>
+  <p style="color:#64748b; font-size:0.82rem; margin-top:10px;">
+    ⚡ <em>Extract, Bible, and Judge stages call the LLM — they may take 30–90 seconds per episode.</em>
+  </p>
+</div>
+""", unsafe_allow_html=True)
+
+    # ── File Uploader ─────────────────────────────────────────────────────────
+    st.markdown("### Step 1 · Upload Episode Files")
+
+    uploaded_files = st.file_uploader(
+        "Drop your screenplay `.txt` files here (one per episode, or multiple at once)",
+        type=["txt"],
+        accept_multiple_files=True,
+        help="Each file should be a plain-text screenplay for one episode. "
+             "Name them anything — the app will auto-assign episode numbers.",
+    )
+
+    # Custom episode number assignment
+    ep_assignments: Dict[str, int] = {}
+    if uploaded_files:
+        st.markdown("#### Episode Number Assignment")
+        st.caption("Auto-detected from filename. Override if needed.")
+        used_nums: set = set()
+        for uf in uploaded_files:
+            auto_ep = _episode_number_from_name(uf.name) or (len(used_nums) + 1)
+            while auto_ep in used_nums:
+                auto_ep += 1
+            col_name, col_num = st.columns([3, 1])
+            with col_name:
+                st.markdown(
+                    f'<span style="font-size:0.9rem; color:#e2e8f0;">📄 {uf.name}'
+                    f' <span style="color:#64748b;">({uf.size:,} bytes)</span></span>',
+                    unsafe_allow_html=True,
+                )
+            with col_num:
+                ep_num = st.number_input(
+                    "Episode #", min_value=1, max_value=999,
+                    value=auto_ep, key=f"epnum_{uf.name}",
+                    label_visibility="collapsed",
+                )
+            ep_assignments[uf.name] = int(ep_num)
+            used_nums.add(int(ep_num))
+
+        # Save button
+        if st.button("💾 Save Files to data/", type="primary", use_container_width=False):
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
+            saved = []
+            for uf in uploaded_files:
+                ep_num = ep_assignments[uf.name]
+                dest   = DATA_DIR / f"episode_{ep_num:03d}.txt"
+                dest.write_bytes(uf.read())
+                saved.append(f"episode_{ep_num:03d}.txt  ← {uf.name}")
+            st.success(f"✅ Saved {len(saved)} file(s):")
+            for s in saved:
+                st.code(s, language="")
+            st.info("Now run the pipeline stages below ↓")
+
+    st.markdown("<hr style='border-color:rgba(255,255,255,0.06);'>", unsafe_allow_html=True)
+
+    # ── Current data/ contents ────────────────────────────────────────────────
+    st.markdown("### 📂 Current Episode Files in data/")
+    existing = sorted(DATA_DIR.glob("episode_*.txt"))
+    if existing:
+        rows = []
+        for f in existing:
+            ep_n = _episode_number_from_name(f.name) or 0
+            facts_file = OUTPUTS_DIR / f"facts_ep{ep_n}.json"
+            extracted  = "✅" if facts_file.exists() else "⬜"
+            rows.append({
+                "File": f.name,
+                "Episode": ep_n,
+                "Size (KB)": round(f.stat().st_size / 1024, 1),
+                "Modified": datetime.fromtimestamp(f.stat().st_mtime).strftime("%Y-%m-%d %H:%M"),
+                "Facts Extracted": extracted,
+            })
+        ep_df = pd.DataFrame(rows)
+        st.dataframe(ep_df, use_container_width=True, height=min(40 + len(rows) * 35, 400))
+
+        # Correlation / coverage bar chart
+        st.markdown("#### Episode Size Distribution")
+        fig_size = px.bar(
+            ep_df, x="Episode", y="Size (KB)",
+            color="Facts Extracted",
+            color_discrete_map={"✅": "#10b981", "⬜": "#334155"},
+            labels={"Facts Extracted": "Extracted"},
+            title="",
+        )
+        fig_size.update_layout(
+            **PLOT_LAYOUT,
+            xaxis=dict(tickformat="d", dtick=5, showgrid=False),
+            yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.07)"),
+            showlegend=True,
+            legend=dict(orientation="h", y=1.1),
+        )
+        st.plotly_chart(fig_size, use_container_width=True)
+    else:
+        st.info("No episode files found in `continuity/data/`. Upload some files above.")
+
+    st.markdown("<hr style='border-color:rgba(255,255,255,0.06);'>", unsafe_allow_html=True)
+
+    # ── Pipeline Runner ───────────────────────────────────────────────────────
+    st.markdown("### ⚙️ Step 2 · Run Pipeline Stages")
+
+    ROOT = BASE_DIR.parent  # MicroDrama - Fix/
+
+    # Stage 1: Parse
+    with st.expander("**Stage 1 · Parse** — Split all episode files into structured JSON", expanded=True):
+        st.caption("`parse.py` reads every `episode_NNN.txt` → `data/episodes.json`")
+        if st.button("▶ Run Parser", key="run_parse"):
+            ph = st.empty()
+            code, out = _run_stage(
+                [sys.executable, "-m", "continuity.parse"],
+                ROOT, ph
+            )
+            if code == 0:
+                st.success("✅ Parse complete! `data/episodes.json` updated.")
+                st.cache_data.clear()
+            else:
+                st.error(f"❌ Parse failed (exit {code})")
+
+    # Stage 2: Extract (per episode or all)
+    with st.expander("**Stage 2 · Extract Facts** — Run LLM fact extraction per episode"):
+        st.caption("`extract.py` calls the LLM for each episode → `outputs/facts_epN.json`")
+        c_ep, c_all = st.columns([2, 1])
+        with c_ep:
+            ep_nums_available = sorted(
+                set(
+                    _episode_number_from_name(f.name)
+                    for f in existing
+                    if _episode_number_from_name(f.name) is not None
+                )
+            ) if existing else [1]
+            ep_to_extract = st.multiselect(
+                "Select episodes to extract",
+                ep_nums_available,
+                default=ep_nums_available[:2] if ep_nums_available else [],
+                help="Select which episode numbers to run extraction on.",
+            )
+        with c_all:
+            extract_all = st.checkbox("Extract ALL episodes", value=False)
+
+        if st.button("▶ Run Extractor", key="run_extract"):
+            targets = ep_nums_available if extract_all else ep_to_extract
+            if not targets:
+                st.warning("Select at least one episode.")
+            else:
+                for ep_n in targets:
+                    st.markdown(f"**Episode {ep_n}…**")
+                    ph = st.empty()
+                    code, _ = _run_stage(
+                        [sys.executable, "-m", "continuity.extract", "--eps", str(ep_n)],
+                        ROOT, ph
+                    )
+                    if code == 0:
+                        st.success(f"✅ Ep {ep_n} extracted.")
+                    else:
+                        st.error(f"❌ Ep {ep_n} failed (exit {code})")
+                st.cache_data.clear()
+
+    # Stage 3: Bible
+    with st.expander("**Stage 3 · Build Series Bible** — Merge all facts into canonical entities"):
+        st.caption("`bible.py` merges facts, normalises aliases → `outputs/bible.json` + `outputs/alias_map.json`")
+        if st.button("▶ Build Bible", key="run_bible"):
+            ph = st.empty()
+            code, _ = _run_stage(
+                [sys.executable, "-m", "continuity.bible"],
+                ROOT, ph
+            )
+            if code == 0:
+                st.success("✅ Bible built! Check the **Series Bible Explorer** tab.")
+                st.cache_data.clear()
+            else:
+                st.error(f"❌ Bible failed (exit {code})")
+
+    # Stage 4: Detect
+    with st.expander("**Stage 4 · Detect Contradictions** — Find value conflicts and state errors"):
+        st.caption("`detect.py` runs two-pass detection → `outputs/candidates.json`")
+        if st.button("▶ Run Detector", key="run_detect"):
+            ph = st.empty()
+            code, _ = _run_stage(
+                [sys.executable, "-m", "continuity.detect"],
+                ROOT, ph
+            )
+            if code == 0:
+                st.success("✅ Detection done! Candidates saved.")
+                st.cache_data.clear()
+            else:
+                st.error(f"❌ Detect failed (exit {code})")
+
+    # Stage 5: Judge
+    with st.expander("**Stage 5 · Judge Flags** — LLM verdict on each candidate pair"):
+        st.caption("`judge.py` sends each candidate to the LLM → `outputs/flags.csv` + `outputs/judgments.json`")
+        if st.button("▶ Run Judge", key="run_judge"):
+            ph = st.empty()
+            code, _ = _run_stage(
+                [sys.executable, "-m", "continuity.judge"],
+                ROOT, ph
+            )
+            if code == 0:
+                st.success("✅ Judgments complete! Switch to **Human Review Queue** to review flags.")
+                st.cache_data.clear()
+            else:
+                st.error(f"❌ Judge failed (exit {code})")
+
+    # Full pipeline shortcut
+    st.markdown("<hr style='border-color:rgba(255,255,255,0.06);'>", unsafe_allow_html=True)
+    st.markdown("### ⚡ Run Full Pipeline")
+    st.caption("Runs Parse → Extract (all eps) → Bible → Detect → Judge sequentially. May take several minutes.")
+    if st.button("🚀 Run ALL Stages", type="primary", key="run_all"):
+        stages = [
+            ("Parse",   [sys.executable, "-m", "continuity.parse"]),
+            ("Bible",   [sys.executable, "-m", "continuity.bible"]),
+            ("Detect",  [sys.executable, "-m", "continuity.detect"]),
+            ("Judge",   [sys.executable, "-m", "continuity.judge"]),
+        ]
+        # Insert extract stages per episode
+        all_eps = sorted(
+            set(
+                _episode_number_from_name(f.name)
+                for f in existing
+                if _episode_number_from_name(f.name) is not None
+            )
+        ) if existing else []
+        all_stages = [stages[0]]  # Parse first
+        for ep_n in all_eps:
+            all_stages.append(
+                (f"Extract Ep {ep_n}", [sys.executable, "-m", "continuity.extract", "--eps", str(ep_n)])
+            )
+        all_stages += stages[1:]  # Bible, Detect, Judge
+
+        progress = st.progress(0, text="Starting pipeline…")
+        for i, (name, cmd) in enumerate(all_stages):
+            st.markdown(f"**▶ {name}**")
+            ph = st.empty()
+            code, _ = _run_stage(cmd, ROOT, ph)
+            if code != 0:
+                st.error(f"❌ Pipeline stopped at **{name}** (exit {code}). Fix the error and retry.")
+                break
+            st.success(f"✅ {name} done")
+            progress.progress((i + 1) / len(all_stages), text=f"Completed: {name}")
+        else:
+            st.balloons()
+            st.success("🎉 Full pipeline complete! Refresh to see results.")
+            st.cache_data.clear()
+
+    # ── Correlation Explorer (from existing facts) ────────────────────────────
+    st.markdown("<hr style='border-color:rgba(255,255,255,0.06);'>", unsafe_allow_html=True)
+    st.markdown("### 🔗 Episode Correlation Explorer")
+    st.caption("Explore which episodes share the same entities and attributes — before running the judge.")
+
+    facts_files = sorted(OUTPUTS_DIR.glob("facts_ep*.json"))
+    if not facts_files:
+        st.info("No facts extracted yet. Run **Stage 2 · Extract Facts** first.")
+    else:
+        # Load all facts
+        all_facts: List[Dict] = []
+        for ff in facts_files:
+            try:
+                ep_n = _episode_number_from_name(ff.name) or 0
+                data = json.loads(ff.read_text(encoding="utf-8"))
+                for rec in data:
+                    rec["_episode"] = ep_n
+                all_facts.extend(data)
+            except Exception:
+                pass
+
+        if all_facts:
+            facts_df = pd.DataFrame(all_facts)
+            facts_df["_episode"] = facts_df["_episode"].astype(int)
+
+            col_a, col_b = st.columns(2)
+            with col_a:
+                st.markdown("#### Facts per Episode")
+                ep_fact_counts = facts_df.groupby("_episode").size().reset_index(name="Fact Count")
+                fig_epc = px.bar(
+                    ep_fact_counts, x="_episode", y="Fact Count",
+                    labels={"_episode": "Episode"},
+                    color="Fact Count",
+                    color_continuous_scale=[[0, "#3b82f6"], [1, "#6366f1"]],
+                )
+                fig_epc.update_layout(**PLOT_LAYOUT, coloraxis_showscale=False,
+                                       xaxis=dict(tickformat="d", dtick=1))
+                st.plotly_chart(fig_epc, use_container_width=True)
+
+            with col_b:
+                st.markdown("#### Top Entities Across Episodes")
+                if "entity" in facts_df.columns:
+                    ent_ep = facts_df.groupby("entity")["_episode"].nunique().reset_index()
+                    ent_ep.columns = ["Entity", "Episodes Mentioned"]
+                    ent_ep = ent_ep.sort_values("Episodes Mentioned", ascending=False).head(12)
+                    fig_ent = px.bar(
+                        ent_ep, x="Episodes Mentioned", y="Entity",
+                        orientation="h",
+                        color="Episodes Mentioned",
+                        color_continuous_scale=[[0, "#14b8a6"], [1, "#6366f1"]],
+                    )
+                    fig_ent.update_layout(**PLOT_LAYOUT, coloraxis_showscale=False,
+                                          yaxis=dict(autorange="reversed"))
+                    st.plotly_chart(fig_ent, use_container_width=True)
+
+            # Cross-episode entity heatmap
+            if "entity" in facts_df.columns:
+                st.markdown("#### Entity × Episode Heatmap (presence = number of facts)")
+                top_entities = facts_df["entity"].value_counts().head(15).index.tolist()
+                ep_range    = sorted(facts_df["_episode"].unique())
+                heat_data   = facts_df[facts_df["entity"].isin(top_entities)]
+                heat_pivot  = (
+                    heat_data.groupby(["entity", "_episode"])
+                    .size()
+                    .unstack(fill_value=0)
+                    .reindex(columns=ep_range, fill_value=0)
+                )
+                fig_heat = px.imshow(
+                    heat_pivot,
+                    labels=dict(x="Episode", y="Entity", color="# Facts"),
+                    color_continuous_scale="Blues",
+                    aspect="auto",
+                )
+                fig_heat.update_layout(
+                    **PLOT_LAYOUT,
+                    height=max(300, len(top_entities) * 32),
+                    xaxis=dict(tickformat="d"),
+                )
+                st.plotly_chart(fig_heat, use_container_width=True)
+
+            # Attribute distribution
+            if "attribute" in facts_df.columns:
+                st.markdown("#### Most-Tracked Attributes")
+                attr_counts = facts_df["attribute"].value_counts().head(15).reset_index()
+                attr_counts.columns = ["Attribute", "Count"]
+                fig_attr = px.bar(
+                    attr_counts, x="Count", y="Attribute", orientation="h",
+                    color="Count",
+                    color_continuous_scale=[[0, "#f59e0b"], [1, "#ef4444"]],
+                )
+                fig_attr.update_layout(**PLOT_LAYOUT, coloraxis_showscale=False,
+                                        yaxis=dict(autorange="reversed"))
+                st.plotly_chart(fig_attr, use_container_width=True)
+
+            # Raw facts table with filters
+            st.markdown("#### 🔎 Browse Raw Facts")
+            fc1, fc2, fc3 = st.columns([2, 2, 3])
+            with fc1:
+                ep_filter = st.multiselect(
+                    "Episode", sorted(facts_df["_episode"].unique()),
+                    default=[], key="facts_ep_filter"
+                )
+            with fc2:
+                ent_opts = ["ALL"] + sorted(facts_df["entity"].dropna().unique()) if "entity" in facts_df.columns else ["ALL"]
+                ent_filter = st.selectbox("Entity", ent_opts, key="facts_ent_filter")
+            with fc3:
+                attr_opts = ["ALL"] + sorted(facts_df["attribute"].dropna().unique()) if "attribute" in facts_df.columns else ["ALL"]
+                attr_filter = st.selectbox("Attribute", attr_opts, key="facts_attr_filter")
+
+            view_df = facts_df.copy()
+            if ep_filter:
+                view_df = view_df[view_df["_episode"].isin(ep_filter)]
+            if ent_filter != "ALL" and "entity" in view_df.columns:
+                view_df = view_df[view_df["entity"] == ent_filter]
+            if attr_filter != "ALL" and "attribute" in view_df.columns:
+                view_df = view_df[view_df["attribute"] == attr_filter]
+
+            display_cols = [c for c in ["_episode", "entity", "attribute", "value", "timestamp", "reliability", "quote"] if c in view_df.columns]
+            st.dataframe(
+                view_df[display_cols].rename(columns={"_episode": "Episode"}),
+                use_container_width=True,
+                height=380,
+            )
+            st.caption(f"Showing {len(view_df)} of {len(facts_df)} facts")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Main Entry
 # ─────────────────────────────────────────────────────────────────────────────
 def main() -> None:
@@ -1035,12 +1458,16 @@ def main() -> None:
     st.markdown("<br>", unsafe_allow_html=True)
 
     # ── Tabs ─────────────────────────────────────────────────────────────────
-    tab_r, tab_v, tab_b, tab_e = st.tabs([
+    tab_up, tab_r, tab_v, tab_b, tab_e = st.tabs([
+        "📤 Upload & Run Pipeline",
         "🚩 Human Review Queue",
         "📊 Visual Analytics",
         "📖 Series Bible Explorer",
         "📥 Export Reports",
     ])
+
+    with tab_up:
+        render_upload_tab()
 
     with tab_r:
         reviews = render_review_tab(df, reviews)
