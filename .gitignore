@@ -1,0 +1,14 @@
+# Environment & Secrets
+.env
+.env.local
+*.env
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Local LLM Disk Caches & Temporary Artifacts
+.cache/
+.streamlit/

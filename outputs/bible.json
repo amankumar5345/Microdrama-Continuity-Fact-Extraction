@@ -1,0 +1,482 @@
+{
+  "ARISTOCRATIC CONGREGATION": {
+    "audience": [
+      {
+        "value": "entire aristocratic congregation witnesses events",
+        "ep": 2,
+        "timestamp": "00:00.00",
+        "quote": "CONTINUITY NOTES: Picks up directly from Episode 1's cliffhanger. Gerald has turned away from Juliana at the altar, leaving her devastated before the entire aristocratic congregation.",
+        "reliability": "stated"
+      }
+    ]
+  },
+  "BOTH FAMILIES": {
+    "witness": [
+      {
+        "value": "present at wedding ceremony",
+        "ep": 2,
+        "timestamp": "00:18.20",
+        "quote": "You gave me your word before both our families.",
+        "reliability": "stated"
+      }
+    ]
+  },
+  "Blond Nobleman": {
+    "description": [
+      {
+        "value": "seated prominently in the family pew, clutching his gold-topped cane",
+        "ep": 2,
+        "timestamp": "00:30.60",
+        "quote": "Medium shot of Juliana's father seated prominently in the family pew, clutching his gold-topped cane.",
+        "reliability": "stated"
+      }
+    ],
+    "father": [
+      {
+        "value": "Juliana's elderly father",
+        "ep": 1,
+        "timestamp": "01:19.00",
+        "quote": "Juliana turns abruptly toward the first row of pews, where her elderly father sits gripping an ornate brass cane.",
+        "reliability": "stated"
+      }
+    ],
+    "father_of": [
+      {
+        "value": "Juliana",
+        "ep": 2,
+        "timestamp": "00:30.90",
+        "quote": "Father...",
+        "reliability": "stated"
+      }
+    ],
+    "location": [
+      {
+        "value": "first row of pews",
+        "ep": 1,
+        "timestamp": "01:19.00",
+        "quote": "Juliana turns abruptly toward the first row of pews, where her elderly father sits gripping an ornate brass cane.",
+        "reliability": "stated"
+      }
+    ],
+    "prop": [
+      {
+        "value": "ornate brass cane with gold curved handle",
+        "ep": 1,
+        "timestamp": "01:19.00",
+        "quote": "Juliana turns abruptly toward the first row of pews, where her elderly father sits gripping an ornate brass cane.",
+        "reliability": "stated"
+      }
+    ],
+    "reaction": [
+      {
+        "value": "refuses to meet Juliana's gaze or speak",
+        "ep": 1,
+        "timestamp": "01:23.70",
+        "quote": "Close-up on the father's weathered face, looking fixedly at the floor, refusing to meet her gaze.",
+        "reliability": "stated"
+      }
+    ]
+  },
+  "Cathedral": {
+    "location": [
+      {
+        "value": "wedding venue with nave, altar, aisle, wooden pews",
+        "ep": 1,
+        "timestamp": "00:00.00",
+        "quote": "INT. CATHEDRAL – DAY",
+        "reliability": "stated"
+      },
+      {
+        "value": "INT. CATHEDRAL – CONTINUOUS",
+        "ep": 2,
+        "timestamp": "00:00.00",
+        "quote": "Scene heading: INT. CATHEDRAL – CONTINUOUS",
+        "reliability": "stated"
+      }
+    ]
+  },
+  "Clarissa": {
+    "attire": [
+      {
+        "value": "gold gown and white gloves",
+        "ep": 1,
+        "timestamp": "00:09.80",
+        "quote": "Medium profile shot at the altar showing Gerald in his dark tailcoat holding the gloved hand of the Lady in Gold Gown, with Juliana visible walking down the distant aisle.",
+        "reliability": "stated"
+      }
+    ],
+    "duration of conspiracy": [
+      {
+        "value": "long enough to know Gerald was never going to marry Juliana",
+        "ep": 1,
+        "timestamp": "01:15.00",
+        "quote": "Long enough to know he was never going to marry you.",
+        "reliability": "stated"
+      }
+    ],
+    "insult": [
+      {
+        "value": "mocks Juliana's mother's apothecary herbs",
+        "ep": 2,
+        "timestamp": "01:00.60",
+        "quote": "...not a dull creature who hides in her mother's apothecary herbs.",
+        "reliability": "stated"
+      }
+    ],
+    "knowledge": [
+      {
+        "value": "knew about the switch beforehand",
+        "ep": 1,
+        "timestamp": "01:10.60",
+        "quote": "Of course I knew.",
+        "reliability": "stated"
+      }
+    ],
+    "marriage": [
+      {
+        "value": "marrying Gerald",
+        "ep": 1,
+        "timestamp": "00:39.10",
+        "quote": "Because he is marrying me.",
+        "reliability": "stated"
+      }
+    ],
+    "name": [
+      {
+        "value": "Clarissa",
+        "ep": 2,
+        "timestamp": "00:47.80",
+        "quote": "Why are you surprised, sister? Look at you.",
+        "reliability": "stated"
+      }
+    ],
+    "sibling": [
+      {
+        "value": "sister of Juliana",
+        "ep": 1,
+        "timestamp": "01:06.50",
+        "quote": "People change their minds, sister.",
+        "reliability": "stated"
+      }
+    ],
+    "sister_of": [
+      {
+        "value": "Juliana",
+        "ep": 2,
+        "timestamp": "00:47.80",
+        "quote": "Why are you surprised, sister? Look at you.",
+        "reliability": "stated"
+      }
+    ]
+  },
+  "Clarissa's Gown": {
+    "description": [
+      {
+        "value": "shimmering gold gown",
+        "ep": 2,
+        "timestamp": "00:00.00",
+        "quote": "Medium low-angle shot on Gerald at the altar steps, looking down dismissively, while Clarissa in her shimmering gold gown stands behind him gloating.",
+        "reliability": "stated"
+      }
+    ]
+  },
+  "GOLD-TOPPED CANE": {
+    "description": [
+      {
+        "value": "gold-topped cane clutched by Juliana's father",
+        "ep": 2,
+        "timestamp": "00:30.60",
+        "quote": "Medium shot of Juliana's father seated prominently in the family pew, clutching his gold-topped cane.",
+        "reliability": "stated"
+      }
+    ]
+  },
+  "Gerald": {
+    "attire": [
+      {
+        "value": "dark tailcoat",
+        "ep": 1,
+        "timestamp": "00:09.80",
+        "quote": "Medium profile shot at the altar showing Gerald in his dark tailcoat holding the gloved hand of the Lady in Gold Gown, with Juliana visible walking down the distant aisle.",
+        "reliability": "stated"
+      }
+    ],
+    "chooses": [
+      {
+        "value": "Clarissa over Juliana",
+        "ep": 2,
+        "timestamp": "00:27.80",
+        "quote": "She is what I should have chosen from the beginning.",
+        "reliability": "stated"
+      }
+    ],
+    "command": [
+      {
+        "value": "tells Juliana to go home quietly and leave the chapel with some dignity",
+        "ep": 2,
+        "timestamp": "01:09.40",
+        "quote": "Go home quietly, Juliana. At least leave this chapel with some dignity.",
+        "reliability": "stated"
+      }
+    ],
+    "former engagement": [
+      {
+        "value": "was engaged to Juliana",
+        "ep": 1,
+        "timestamp": "01:00.10",
+        "quote": "I changed my mind.",
+        "reliability": "stated"
+      }
+    ],
+    "marital_intent": [
+      {
+        "value": "refuses to marry Juliana",
+        "ep": 2,
+        "timestamp": "00:00.00",
+        "quote": "I cannot marry you, Juliana.",
+        "reliability": "stated"
+      }
+    ],
+    "name": [
+      {
+        "value": "Gerald",
+        "ep": 2,
+        "timestamp": "00:00.00",
+        "quote": "I cannot marry you, Juliana.",
+        "reliability": "stated"
+      }
+    ],
+    "response": [
+      {
+        "value": "Promises change when a better choice appears",
+        "ep": 2,
+        "timestamp": "00:20.90",
+        "quote": "Promises change when a better choice appears.",
+        "reliability": "stated"
+      }
+    ],
+    "value assessment": [
+      {
+        "value": "Juliana has nothing to offer him anymore",
+        "ep": 1,
+        "timestamp": "01:59.80",
+        "quote": "You have nothing to offer me anymore.",
+        "reliability": "stated"
+      }
+    ]
+  },
+  "HEIRLOOM AMETHYST PENDANT": {
+    "description": [
+      {
+        "value": "heirloom amethyst pendant resting against Juliana's gown",
+        "ep": 2,
+        "timestamp": "00:18.00",
+        "quote": "Tight insert on Juliana's hand clutching the heirloom amethyst pendant resting against her gown.",
+        "reliability": "stated"
+      }
+    ]
+  },
+  "Juliana's Gown": {
+    "description": [
+      {
+        "value": "plain, old-fashioned gown",
+        "ep": 2,
+        "timestamp": "00:51.60",
+        "quote": "That plain, old-fashioned gown.",
+        "reliability": "stated"
+      }
+    ]
+  },
+  "Lady Juliana": {
+    "action": [
+      {
+        "value": "clutches mother's silk bridal gown",
+        "ep": 1,
+        "timestamp": "02:11.30",
+        "quote": "Juliana's hand clenches fiercely into the folds of her mother's silk bridal gown, knuckles whitening with suppressed fury.",
+        "reliability": "stated"
+      }
+    ],
+    "attire": [
+      {
+        "value": "mother's vintage gown and oval pendant necklace",
+        "ep": 1,
+        "timestamp": "00:01.00",
+        "quote": "Juliana pauses at the threshold, her expression bright with joyful anticipation, wearing her mother's vintage gown and an oval pendant necklace.",
+        "reliability": "stated"
+      }
+    ],
+    "belief": [
+      {
+        "value": "Gerald is waiting for her at the altar",
+        "ep": 1,
+        "timestamp": "00:15.50",
+        "quote": "Gerald is waiting for me.",
+        "reliability": "stated"
+      }
+    ],
+    "claim": [
+      {
+        "value": "Gerald gave his word before both families",
+        "ep": 2,
+        "timestamp": "00:18.20",
+        "quote": "You gave me your word before both our families.",
+        "reliability": "stated"
+      }
+    ],
+    "declaration": [
+      {
+        "value": "Do not mistake my heartbreak for your victory, Gerald",
+        "ep": 2,
+        "timestamp": "01:23.00",
+        "quote": "Do not mistake my heartbreak for your victory, Gerald.",
+        "reliability": "stated"
+      }
+    ],
+    "former engagement": [
+      {
+        "value": "Gerald was her fiancé",
+        "ep": 1,
+        "timestamp": "01:03.40",
+        "quote": "You swore you loved me!",
+        "reliability": "stated"
+      }
+    ],
+    "name": [
+      {
+        "value": "Juliana",
+        "ep": 2,
+        "timestamp": "00:00.00",
+        "quote": "I cannot marry you, Juliana.",
+        "reliability": "stated"
+      }
+    ],
+    "possesses": [
+      {
+        "value": "heirloom amethyst pendant",
+        "ep": 2,
+        "timestamp": "00:18.00",
+        "quote": "Tight insert on Juliana's hand clutching the heirloom amethyst pendant resting against her gown.",
+        "reliability": "stated"
+      }
+    ],
+    "public_rebuke": [
+      {
+        "value": "states Gerald has shown everyone what his word is worth",
+        "ep": 2,
+        "timestamp": "01:33.40",
+        "quote": "You have shown them exactly what your word is worth.",
+        "reliability": "stated"
+      }
+    ]
+  },
+  "MOTHER'S APOTHECARY HERBS": {
+    "reference": [
+      {
+        "value": "mother's apothecary herbs",
+        "ep": 2,
+        "timestamp": "01:00.60",
+        "quote": "...not a dull creature who hides in her mother's apothecary herbs.",
+        "reliability": "stated"
+      }
+    ]
+  },
+  "PRIEST": {
+    "presence": [
+      {
+        "value": "present at altar with Gerald and Clarissa",
+        "ep": 2,
+        "timestamp": "00:23.80",
+        "quote": "Medium two-shot of Gerald and Clarissa standing side by side before the priest.",
+        "reliability": "stated"
+      }
+    ]
+  },
+  "The Matriarch": {
+    "attire": [
+      {
+        "value": "black velvet, ornate tiara, sapphire jewelry",
+        "ep": 1,
+        "timestamp": "00:17.80",
+        "quote": "Close-up on the Matriarch wearing an ornate tiara and sapphire jewelry, gazing down with merciless disdain.",
+        "reliability": "stated"
+      }
+    ],
+    "clarissa's title": [
+      {
+        "value": "jewel of this family",
+        "ep": 1,
+        "timestamp": "01:53.30",
+        "quote": "Clarissa is the jewel of this family.",
+        "reliability": "stated"
+      }
+    ],
+    "command": [
+      {
+        "value": "tells Juliana to turn around",
+        "ep": 1,
+        "timestamp": "00:11.30",
+        "quote": "You should turn around, Juliana.",
+        "reliability": "stated"
+      }
+    ],
+    "description": [
+      {
+        "value": "matriarch dressed in an ornate black velvet gown",
+        "ep": 2,
+        "timestamp": "01:03.50",
+        "quote": "High-angle wide shot of the grand cathedral aisle as a matriarch dressed in an ornate black velvet gown glides toward Juliana.",
+        "reliability": "stated"
+      }
+    ],
+    "gerald's intention": [
+      {
+        "value": "not waiting for Juliana anymore",
+        "ep": 1,
+        "timestamp": "00:18.00",
+        "quote": "Not anymore.",
+        "reliability": "stated"
+      }
+    ],
+    "mother": [
+      {
+        "value": "mother of Juliana and Clarissa",
+        "ep": 1,
+        "timestamp": "01:30.90",
+        "quote": "You have embarrassed this family long enough.",
+        "reliability": "stated"
+      }
+    ],
+    "remark": [
+      {
+        "value": "tells Juliana she should be grateful to be allowed to attend the wedding",
+        "ep": 2,
+        "timestamp": "01:06.10",
+        "quote": "You should be grateful you're at least allowed to attend the wedding.",
+        "reliability": "stated"
+      }
+    ]
+  },
+  "Timeline": {
+    "event": [
+      {
+        "value": "wedding day ceremony",
+        "ep": 1,
+        "timestamp": "00:00.00",
+        "quote": "INT. CATHEDRAL – DAY",
+        "reliability": "stated"
+      }
+    ]
+  },
+  "Wedding Guests": {
+    "reaction": [
+      {
+        "value": "whispering and casting judging glances",
+        "ep": 1,
+        "timestamp": "00:29.80",
+        "quote": "Panning shot across the seated wedding guests whispering and casting judging glances from the wooden pews.",
+        "reliability": "stated"
+      }
+    ]
+  }
+}

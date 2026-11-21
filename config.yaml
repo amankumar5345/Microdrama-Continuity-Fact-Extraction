@@ -1,0 +1,14 @@
+# Continuity Checker Configuration
+llm:
+  provider: "openrouter" # Options: openrouter, openai, gemini, groq
+  model: "nvidia/nemotron-3-ultra-550b-a55b:free" # 100% Free-tier model on OpenRouter
+  temperature: 0.0 # Strict zero temperature for deterministic, factual outputs
+  cache_dir: ".cache/llm" # Disk cache location for zero-cost reruns
+  timeout_seconds: 60
+  max_retries: 3
+
+# Pipeline Settings
+checker:
+  min_episodes: 1
+  max_episodes: 50
+  strict_quote_verification: true # Ensures every extracted fact exists verbatim in the screenplay

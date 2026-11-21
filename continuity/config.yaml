@@ -1,0 +1,5 @@
+provider: "openai" # Options: "gemini" or "openai" (covers OpenRouter, Groq, OpenAI, etc.)
+model: "nvidia/nemotron-3-ultra-550b-a55b:free"
+api_key_env: "OPENROUTER_API_KEY"
+base_url: "https://openrouter.ai/api/v1" # Used for OpenAI-compatible endpoints
+temperature: 0.0

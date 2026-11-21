@@ -1,0 +1,22 @@
+[
+  {
+    "type": "value_conflict",
+    "entity": "Cathedral",
+    "attribute": "location",
+    "fact_a": {
+      "value": "wedding venue with nave, altar, aisle, wooden pews",
+      "ep": 1,
+      "timestamp": "00:00.00",
+      "quote": "INT. CATHEDRAL – DAY",
+      "reliability": "stated"
+    },
+    "fact_b": {
+      "value": "INT. CATHEDRAL – CONTINUOUS",
+      "ep": 2,
+      "timestamp": "00:00.00",
+      "quote": "Scene heading: INT. CATHEDRAL – CONTINUOUS",
+      "reliability": "stated"
+    },
+    "description": "Value conflict for Cathedral -> location: Ep 1 ('wedding venue with nave, altar, aisle, wooden pews') vs Ep 2 ('INT. CATHEDRAL – CONTINUOUS')"
+  }
+]

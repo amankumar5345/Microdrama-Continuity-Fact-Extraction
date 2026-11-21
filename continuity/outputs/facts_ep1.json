@@ -1,0 +1,279 @@
+{
+  "episode": 1,
+  "facts_count": 24,
+  "dropped_count": 4,
+  "facts": [
+    {
+      "entity": "Lady Juliana",
+      "aliases": [
+        "Juliana"
+      ],
+      "category": "object",
+      "attribute": "attire",
+      "value": "mother's vintage gown and oval pendant necklace",
+      "reliability": "stated",
+      "timestamp": "00:01.00",
+      "quote": "Juliana pauses at the threshold, her expression bright with joyful anticipation, wearing her mother's vintage gown and an oval pendant necklace."
+    },
+    {
+      "entity": "Gerald",
+      "aliases": [
+        "The Former Groom"
+      ],
+      "category": "object",
+      "attribute": "attire",
+      "value": "dark tailcoat",
+      "reliability": "stated",
+      "timestamp": "00:09.80",
+      "quote": "Medium profile shot at the altar showing Gerald in his dark tailcoat holding the gloved hand of the Lady in Gold Gown, with Juliana visible walking down the distant aisle."
+    },
+    {
+      "entity": "Lady in Gold Gown",
+      "aliases": [
+        "Clarissa"
+      ],
+      "category": "object",
+      "attribute": "attire",
+      "value": "gold gown and white gloves",
+      "reliability": "stated",
+      "timestamp": "00:09.80",
+      "quote": "Medium profile shot at the altar showing Gerald in his dark tailcoat holding the gloved hand of the Lady in Gold Gown, with Juliana visible walking down the distant aisle."
+    },
+    {
+      "entity": "Matriarch",
+      "aliases": [],
+      "category": "object",
+      "attribute": "attire",
+      "value": "black velvet, ornate tiara, sapphire jewelry",
+      "reliability": "stated",
+      "timestamp": "00:17.80",
+      "quote": "Close-up on the Matriarch wearing an ornate tiara and sapphire jewelry, gazing down with merciless disdain."
+    },
+    {
+      "entity": "Matriarch",
+      "aliases": [],
+      "category": "relationship",
+      "attribute": "command",
+      "value": "tells Juliana to turn around",
+      "reliability": "stated",
+      "timestamp": "00:11.30",
+      "quote": "You should turn around, Juliana."
+    },
+    {
+      "entity": "Lady Juliana",
+      "aliases": [
+        "Juliana"
+      ],
+      "category": "relationship",
+      "attribute": "belief",
+      "value": "Gerald is waiting for her at the altar",
+      "reliability": "stated",
+      "timestamp": "00:15.50",
+      "quote": "Gerald is waiting for me."
+    },
+    {
+      "entity": "Matriarch",
+      "aliases": [],
+      "category": "status",
+      "attribute": "gerald's intention",
+      "value": "not waiting for Juliana anymore",
+      "reliability": "stated",
+      "timestamp": "00:18.00",
+      "quote": "Not anymore."
+    },
+    {
+      "entity": "Lady in Gold Gown",
+      "aliases": [
+        "Clarissa"
+      ],
+      "category": "relationship",
+      "attribute": "marriage",
+      "value": "marrying Gerald",
+      "reliability": "stated",
+      "timestamp": "00:39.10",
+      "quote": "Because he is marrying me."
+    },
+    {
+      "entity": "Lady in Gold Gown",
+      "aliases": [
+        "Clarissa"
+      ],
+      "category": "relationship",
+      "attribute": "sibling",
+      "value": "sister of Juliana",
+      "reliability": "stated",
+      "timestamp": "01:06.50",
+      "quote": "People change their minds, sister."
+    },
+    {
+      "entity": "Lady in Gold Gown",
+      "aliases": [
+        "Clarissa"
+      ],
+      "category": "status",
+      "attribute": "knowledge",
+      "value": "knew about the switch beforehand",
+      "reliability": "stated",
+      "timestamp": "01:10.60",
+      "quote": "Of course I knew."
+    },
+    {
+      "entity": "Lady in Gold Gown",
+      "aliases": [
+        "Clarissa"
+      ],
+      "category": "timeline",
+      "attribute": "duration of conspiracy",
+      "value": "long enough to know Gerald was never going to marry Juliana",
+      "reliability": "stated",
+      "timestamp": "01:15.00",
+      "quote": "Long enough to know he was never going to marry you."
+    },
+    {
+      "entity": "Father",
+      "aliases": [
+        "Juliana's father"
+      ],
+      "category": "place",
+      "attribute": "location",
+      "value": "first row of pews",
+      "reliability": "stated",
+      "timestamp": "01:19.00",
+      "quote": "Juliana turns abruptly toward the first row of pews, where her elderly father sits gripping an ornate brass cane."
+    },
+    {
+      "entity": "Father",
+      "aliases": [
+        "Juliana's father"
+      ],
+      "category": "object",
+      "attribute": "prop",
+      "value": "ornate brass cane with gold curved handle",
+      "reliability": "stated",
+      "timestamp": "01:19.00",
+      "quote": "Juliana turns abruptly toward the first row of pews, where her elderly father sits gripping an ornate brass cane."
+    },
+    {
+      "entity": "Father",
+      "aliases": [
+        "Juliana's father"
+      ],
+      "category": "relationship",
+      "attribute": "reaction",
+      "value": "refuses to meet Juliana's gaze or speak",
+      "reliability": "stated",
+      "timestamp": "01:23.70",
+      "quote": "Close-up on the father's weathered face, looking fixedly at the floor, refusing to meet her gaze."
+    },
+    {
+      "entity": "Matriarch",
+      "aliases": [],
+      "category": "status",
+      "attribute": "clarissa's title",
+      "value": "jewel of this family",
+      "reliability": "stated",
+      "timestamp": "01:53.30",
+      "quote": "Clarissa is the jewel of this family."
+    },
+    {
+      "entity": "Gerald",
+      "aliases": [
+        "The Former Groom"
+      ],
+      "category": "relationship",
+      "attribute": "value assessment",
+      "value": "Juliana has nothing to offer him anymore",
+      "reliability": "stated",
+      "timestamp": "01:59.80",
+      "quote": "You have nothing to offer me anymore."
+    },
+    {
+      "entity": "Lady Juliana",
+      "aliases": [
+        "Juliana"
+      ],
+      "category": "object",
+      "attribute": "action",
+      "value": "clutches mother's silk bridal gown",
+      "reliability": "stated",
+      "timestamp": "02:11.30",
+      "quote": "Juliana's hand clenches fiercely into the folds of her mother's silk bridal gown, knuckles whitening with suppressed fury."
+    },
+    {
+      "entity": "Cathedral",
+      "aliases": [],
+      "category": "place",
+      "attribute": "location",
+      "value": "wedding venue with nave, altar, aisle, wooden pews",
+      "reliability": "stated",
+      "timestamp": "00:00.00",
+      "quote": "INT. CATHEDRAL – DAY"
+    },
+    {
+      "entity": "Lady Juliana",
+      "aliases": [
+        "Juliana"
+      ],
+      "category": "relationship",
+      "attribute": "former engagement",
+      "value": "Gerald was her fiancé",
+      "reliability": "stated",
+      "timestamp": "01:03.40",
+      "quote": "You swore you loved me!"
+    },
+    {
+      "entity": "Gerald",
+      "aliases": [
+        "The Former Groom"
+      ],
+      "category": "relationship",
+      "attribute": "former engagement",
+      "value": "was engaged to Juliana",
+      "reliability": "stated",
+      "timestamp": "01:00.10",
+      "quote": "I changed my mind."
+    },
+    {
+      "entity": "Matriarch",
+      "aliases": [],
+      "category": "relationship",
+      "attribute": "mother",
+      "value": "mother of Juliana and Clarissa",
+      "reliability": "stated",
+      "timestamp": "01:30.90",
+      "quote": "You have embarrassed this family long enough."
+    },
+    {
+      "entity": "Father",
+      "aliases": [
+        "Juliana's father"
+      ],
+      "category": "relationship",
+      "attribute": "father",
+      "value": "Juliana's elderly father",
+      "reliability": "stated",
+      "timestamp": "01:19.00",
+      "quote": "Juliana turns abruptly toward the first row of pews, where her elderly father sits gripping an ornate brass cane."
+    },
+    {
+      "entity": "Wedding Guests",
+      "aliases": [],
+      "category": "status",
+      "attribute": "reaction",
+      "value": "whispering and casting judging glances",
+      "reliability": "stated",
+      "timestamp": "00:29.80",
+      "quote": "Panning shot across the seated wedding guests whispering and casting judging glances from the wooden pews."
+    },
+    {
+      "entity": "Timeline",
+      "aliases": [],
+      "category": "timeline",
+      "attribute": "event",
+      "value": "wedding day ceremony",
+      "reliability": "stated",
+      "timestamp": "00:00.00",
+      "quote": "INT. CATHEDRAL – DAY"
+    }
+  ]
+}

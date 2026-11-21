@@ -1,0 +1,28 @@
+You are a continuity judge for a serialized microdrama.
+Analyze the two facts below extracted from different episodes and determine if this is a genuine continuity error.
+
+CANDIDATE TYPE: {candidate_type}
+ENTITY: {entity}
+ATTRIBUTE: {attribute}
+
+FACT A (Episode {ep_a}, timestamp {timestamp_a}):
+Value: {value_a}
+Quote: "{quote_a}"
+
+FACT B (Episode {ep_b}, timestamp {timestamp_b}):
+Value: {value_b}
+Quote: "{quote_b}"
+
+GUIDELINES:
+1. "real_error": An impossible or contradictory assertion in the story world (e.g. eye color retcon, character dead/jailed yet appearing without explanation).
+2. "legit_change": A natural progression of the plot or time (e.g. broken engagement, changed clothes, traveled to new location, acquired new item).
+3. "deception": One fact is a character lying, teasing, bluffing, or hiding the truth.
+4. "unclear": Insufficient context to determine if it is a deliberate plot twist or an author error.
+
+OUTPUT FORMAT:
+{
+  "verdict": "real_error | legit_change | deception | unclear",
+  "severity": "CRITICAL | HIGH | MEDIUM | LOW",
+  "reason": "Clear explanation of the judgment."
+}
+Output valid JSON only. No commentary.

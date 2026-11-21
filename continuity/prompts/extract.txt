@@ -1,0 +1,30 @@
+You are a continuity analyst for a serialized microdrama.
+Read the screenplay of Episode {episode} below and extract every checkable fact about characters, relationships, status, objects, places and timeline.
+
+RULES:
+1. Every fact needs a verbatim quote from the screenplay and its timestamp. No quote, no fact.
+2. Extract only what is stated or clearly shown. Do not infer.
+3. Use the name exactly as written in the scene, and list any alias used (e.g. "Mr. Cole", "Dan").
+4. If a line is a lie, joke, hypothetical or flashback, set "reliability" to that type. Otherwise use "stated".
+5. Ignore opinions, emotions and plot summary.
+6. Output valid JSON only. No commentary.
+
+OUTPUT FORMAT:
+{
+  "episode": {episode},
+  "facts": [
+    {
+      "entity": "Character Name",
+      "aliases": ["Alias 1", "Alias 2"],
+      "category": "identity | relationship | status | object | place | timeline",
+      "attribute": "attribute_name",
+      "value": "factual_value",
+      "reliability": "stated | lie | flashback | hypothetical",
+      "timestamp": "mm:ss",
+      "quote": "verbatim quote from the screenplay"
+    }
+  ]
+}
+
+SCREENPLAY:
+{screenplay_text}

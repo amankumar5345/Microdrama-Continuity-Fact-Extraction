@@ -1,0 +1,20 @@
+[
+  {
+    "status": "FILTERED",
+    "verdict": "legit_change",
+    "severity": "LOW",
+    "severity_rank": 4,
+    "candidate_type": "value_conflict",
+    "entity": "Cathedral",
+    "attribute": "location",
+    "ep_a": 1,
+    "timestamp_a": "00:00.00",
+    "value_a": "wedding venue with nave, altar, aisle, wooden pews",
+    "quote_a": "INT. CATHEDRAL – DAY",
+    "ep_b": 2,
+    "timestamp_b": "00:00.00",
+    "value_b": "INT. CATHEDRAL – CONTINUOUS",
+    "quote_b": "Scene heading: INT. CATHEDRAL – CONTINUOUS",
+    "reason": "Both facts reference the same location (Cathedral). 'INT. CATHEDRAL – DAY' and 'INT. CATHEDRAL – CONTINUOUS' are standard screenplay sluglines indicating the same interior location; 'CONTINUOUS' simply denotes the action flows immediately from the previous scene without a time cut. The descriptive detail in Fact A (nave, altar, aisle, pews) is consistent with a cathedral interior. No contradiction exists."
+  }
+]
