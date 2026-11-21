@@ -12,3 +12,4 @@ __pycache__/
 # Local LLM Disk Caches & Temporary Artifacts
 .cache/
 .streamlit/
+*.log
