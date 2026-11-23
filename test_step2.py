@@ -14,7 +14,7 @@ from src.models import FactCategory, Reliability, Fact
 def main():
     print("=== Testing Step 2: Screenplay Parser & Data Models ===")
     
-    ep1_path = Path("data/episode_01.txt")
+    ep1_path = Path("data/episode_001.txt")
     assert ep1_path.exists(), f"File {ep1_path} not found"
 
     print(f"Parsing: {ep1_path}...")

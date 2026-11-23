@@ -16,9 +16,12 @@ import json
 import argparse
 import logging
 from pathlib import Path
-from typing import Dict, List, Any, Set, Tuple
+from typing import Dict, List, Any, Optional, Set, Tuple
 from collections import defaultdict
 
+from continuity.textutil import enable_utf8_console, normalize_attribute, normalize_value
+
+enable_utf8_console()
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -57,32 +60,39 @@ def load_bible() -> Dict[str, Dict[str, List[Dict[str, Any]]]]:
     return {}
 
 
-def normalize_value(val: str) -> str:
-    """Normalize string value for comparison."""
-    s = val.strip().lower()
-    s = s.replace('"', '').replace("'", '').replace("’", "").replace("“", "").replace("”", "")
-    s = re.sub(r"[^\w\s]", " ", s)
-    s = re.sub(r"\s+", " ", s)
-    return s.strip()
+def _merged_attributes(
+    attributes: Dict[str, List[Dict[str, Any]]]
+) -> Dict[str, List[Dict[str, Any]]]:
+    """Group attributes that normalize to the same key (e.g. eye_color variants)."""
+    merged: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    for attribute, entries in attributes.items():
+        merged[normalize_attribute(attribute)].extend(entries)
+    return merged
 
 
 def pass_1_value_conflicts(bible: Dict[str, Dict[str, List[Dict[str, Any]]]]) -> List[Dict[str, Any]]:
     """
     Pass 1: Value conflicts.
-    Same entity + attribute, different values in different episodes,
-    ignoring reliability != 'stated'.
+    Same entity + normalized attribute, different stated values in different
+    episodes.
     """
     candidates = []
     seen_pairs: Set[str] = set()
 
     for entity, attributes in bible.items():
-        for attribute, entries in attributes.items():
-            # Filter entries where reliability == 'stated'
-            stated_entries = [e for e in entries if str(e.get("reliability", "")).lower() == "stated"]
+        for attribute, entries in _merged_attributes(attributes).items():
+            if not attribute:
+                continue
+
+            stated_entries = [
+                e
+                for e in entries
+                if str(e.get("reliability", "")).lower() == "stated"
+            ]
             if len(stated_entries) < 2:
                 continue
 
-            # Group entries by episode to pick representative values per episode
+            # Group entries by episode to compare representative values.
             ep_entries: Dict[int, List[Dict[str, Any]]] = defaultdict(list)
             for e in stated_entries:
                 ep_entries[e.get("ep", 0)].append(e)
@@ -101,11 +111,12 @@ def pass_1_value_conflicts(bible: Dict[str, Dict[str, List[Dict[str, Any]]]]) ->
                             norm_a = normalize_value(entry_a.get("value", ""))
                             norm_b = normalize_value(entry_b.get("value", ""))
 
-                            # Check if values conflict
                             if not norm_a or not norm_b or norm_a == norm_b:
                                 continue
 
-                            pair_key = f"{entity}|{attribute}|{ep_a}|{norm_a}|{ep_b}|{norm_b}"
+                            pair_key = (
+                                f"{entity}|{attribute}|{ep_a}|{norm_a}|{ep_b}|{norm_b}"
+                            )
                             if pair_key in seen_pairs:
                                 continue
                             seen_pairs.add(pair_key)
@@ -118,70 +129,93 @@ def pass_1_value_conflicts(bible: Dict[str, Dict[str, List[Dict[str, Any]]]]) ->
                                 "fact_b": entry_b,
                                 "description": (
                                     f"Value conflict for {entity} -> {attribute}: "
-                                    f"Ep {ep_a} ('{entry_a.get('value')}') vs Ep {ep_b} ('{entry_b.get('value')}')"
+                                    f"Ep {ep_a} ('{entry_a.get('value')}') vs "
+                                    f"Ep {ep_b} ('{entry_b.get('value')}')"
                                 ),
                             })
 
     return candidates
 
 
+def _fact_text(fact: Dict[str, Any]) -> str:
+    return f"{fact.get('value', '')} {fact.get('quote', '')}"
+
+
+def _state_category(fact: Dict[str, Any]) -> Optional[str]:
+    text = _fact_text(fact)
+    if DEAD_PATTERNS.search(text):
+        return "dead"
+    if ARREST_PATTERNS.search(text):
+        return "arrested"
+    if INJURED_PATTERNS.search(text):
+        return "injured"
+    return None
+
+
 def pass_2_state_errors(bible: Dict[str, Dict[str, List[Dict[str, Any]]]]) -> List[Dict[str, Any]]:
     """
     Pass 2: State errors.
-    An entity with status like arrested, dead or injured in episode X
-    who appears or speaks in a later episode with no status change in between.
+
+    An entity marked dead/arrested/injured in episode X who has a stated fact in
+    a later episode that is not itself a disabling state, with no reversal
+    (released, healed, survived, ...) anywhere in between.
     """
     candidates = []
     seen_state_errors: Set[str] = set()
 
     for entity, attributes in bible.items():
-        # Collect all facts for this entity sorted by episode and timestamp
         all_facts: List[Dict[str, Any]] = []
-        for attr, entries in attributes.items():
-            for e in entries:
-                f_copy = dict(e)
-                f_copy["attribute"] = attr
-                all_facts.append(f_copy)
+        for attr, entries in _merged_attributes(attributes).items():
+            for entry in entries:
+                fact = dict(entry)
+                fact["attribute"] = attr
+                fact.setdefault("reliability", "stated")
+                all_facts.append(fact)
 
         if not all_facts:
             continue
 
         all_facts.sort(key=lambda x: (x.get("ep", 0), x.get("timestamp", "")))
 
-        # Find disabling status events (dead, arrested, injured)
         for idx, fact_a in enumerate(all_facts):
-            val_a = fact_a.get("value", "") + " " + fact_a.get("quote", "")
-            ep_a = fact_a.get("ep", 0)
-
-            state_category = None
-            if DEAD_PATTERNS.search(val_a):
-                state_category = "dead"
-            elif ARREST_PATTERNS.search(val_a):
-                state_category = "arrested"
-            elif INJURED_PATTERNS.search(val_a):
-                state_category = "injured"
-
-            if not state_category:
+            # Only stated facts can establish a disabling state.
+            if str(fact_a.get("reliability", "")).lower() != "stated":
                 continue
 
-            # Look for later episodes where character appears/speaks
-            reversal_found = False
+            ep_a = fact_a.get("ep", 0)
+            state_category = _state_category(fact_a)
+            if not state_category:
+                continue
+            # "arrested and later released" in one fact is not a disabling state.
+            if REVERSAL_PATTERNS.search(_fact_text(fact_a)):
+                continue
+
             for fact_b in all_facts[idx + 1:]:
-                ep_b = fact_b.get("ep", 0)
-                if ep_b == ep_a:
+                if str(fact_b.get("reliability", "")).lower() != "stated":
                     continue
 
-                val_b = fact_b.get("value", "") + " " + fact_b.get("quote", "")
+                ep_b = fact_b.get("ep", 0)
+                if ep_b <= ep_a:
+                    continue
 
-                # Check if intervening episode had a status reversal (released, healed, survived, etc.)
-                if REVERSAL_PATTERNS.search(val_b):
-                    reversal_found = True
+                text_b = _fact_text(fact_b)
+
+                # A later disabling statement is not evidence of recovery.
+                if _state_category(fact_b):
+                    continue
+
+                # A reversal at any point up to fact_b clears the error.
+                reversal_found = any(
+                    REVERSAL_PATTERNS.search(_fact_text(other))
+                    for other in all_facts
+                    if ep_a < other.get("ep", 0) <= ep_b
+                )
+                if reversal_found:
                     break
 
-                # If character appears or speaks in later episode without reversal
                 error_key = f"{entity}|{state_category}|{ep_a}|{ep_b}"
                 if error_key in seen_state_errors:
-                    continue
+                    break
                 seen_state_errors.add(error_key)
 
                 candidates.append({
@@ -192,12 +226,13 @@ def pass_2_state_errors(bible: Dict[str, Dict[str, List[Dict[str, Any]]]]) -> Li
                     "fact_a": fact_a,
                     "fact_b": fact_b,
                     "description": (
-                        f"State error for {entity}: marked as {state_category} in Ep {ep_a} "
-                        f"(\"{fact_a.get('quote')}\"), but appears/speaks in Ep {ep_b} "
-                        f"(\"{fact_b.get('quote')}\") without an intervening status reversal."
+                        f"State error for {entity}: marked as {state_category} in "
+                        f"Ep {ep_a} (\"{fact_a.get('quote')}\"), but the character has "
+                        f"a stated fact in Ep {ep_b} (\"{fact_b.get('quote')}\") "
+                        f"without an intervening status reversal."
                     ),
                 })
-                # Flag the first subsequent violation per state occurrence
+                # One flag per disabling state occurrence is enough for review.
                 break
 
     return candidates

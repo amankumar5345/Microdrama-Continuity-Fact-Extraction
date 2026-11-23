@@ -18,7 +18,15 @@ from typing import Dict, List, Any, Set
 from collections import defaultdict
 
 from continuity.llm import call_llm
+from continuity.textutil import (
+    clean_aliases,
+    enable_utf8_console,
+    is_noise_entity,
+    normalize_attribute,
+    normalize_name,
+)
 
+enable_utf8_console()
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -67,21 +75,31 @@ def gather_entities_and_aliases(all_episode_data: List[Dict[str, Any]]) -> Dict[
     entity_aliases: Dict[str, Set[str]] = defaultdict(set)
     for ep_data in all_episode_data:
         for f in ep_data.get("facts", []):
-            entity = f.get("entity", "").strip()
-            if not entity:
+            entity = str(f.get("entity", "")).strip()
+            if not entity or is_noise_entity(entity):
                 continue
-            aliases = f.get("aliases", [])
-            if isinstance(aliases, list):
-                for a in aliases:
-                    if a and a.strip() and a.strip().lower() != entity.lower():
-                        entity_aliases[entity].add(a.strip())
-            elif isinstance(aliases, str) and aliases.strip():
-                entity_aliases[entity].add(aliases.strip())
+            entity_aliases[entity].update(
+                clean_aliases(entity, f.get("aliases", []))
+            )
     return entity_aliases
 
 
-def generate_alias_map_with_llm(entity_aliases: Dict[str, Set[str]]) -> Dict[str, str]:
-    """Prompts call_llm() to propose canonical entity alias merges."""
+def _rule_based_alias_map(entity_aliases: Dict[str, Set[str]]) -> Dict[str, str]:
+    """Fallback alias map built from extracted alias lists."""
+    fallback_map: Dict[str, str] = {}
+    for ent, aliases in entity_aliases.items():
+        for alias in aliases:
+            if normalize_name(alias) != normalize_name(ent):
+                fallback_map[alias] = ent
+        fallback_map.setdefault(ent, ent)
+    return fallback_map
+
+
+def generate_alias_map_with_llm(
+    entity_aliases: Dict[str, Set[str]],
+    use_llm: bool = True,
+) -> Dict[str, str]:
+    """Prompt call_llm() to propose canonical entity alias merges."""
     summary_lines = []
     for ent, aliases in sorted(entity_aliases.items()):
         if aliases:
@@ -113,47 +131,39 @@ RULES:
 }}
 """
 
+    if not use_llm:
+        logger.info("LLM alias proposal disabled; using rule-based aliases.")
+        return _rule_based_alias_map(entity_aliases)
+
     logger.info("Asking LLM to propose canonical alias merges...")
     try:
         alias_map = call_llm(prompt, json_mode=True)
         if isinstance(alias_map, dict):
-            # Ensure values are clean strings
-            clean_map = {str(k).strip(): str(v).strip() for k, v in alias_map.items() if str(k).strip() != str(v).strip()}
+            clean_map = {
+                str(k).strip(): str(v).strip()
+                for k, v in alias_map.items()
+                if str(k).strip() and str(v).strip()
+            }
+            # Record identity mappings for names the model left implicit, so
+            # subsequent runs do not keep re-asking about them.
+            covered = {normalize_name(k) for k in clean_map} | {
+                normalize_name(v) for v in clean_map.values()
+            }
+            for ent in entity_aliases:
+                if normalize_name(ent) not in covered:
+                    clean_map[ent] = ent
             return clean_map
     except Exception as e:
         logger.warning(f"LLM alias proposal failed: {e}. Falling back to rule-based aliases.")
 
-    # Fallback: simple alias list invert
-    fallback_map: Dict[str, str] = {}
-    for ent, aliases in entity_aliases.items():
-        for a in aliases:
-            if a.lower() != ent.lower():
-                fallback_map[a] = ent
-    return fallback_map
+    return _rule_based_alias_map(entity_aliases)
 
 
-def get_or_create_alias_map(entity_aliases: Dict[str, Set[str]], force_rebuild: bool = False) -> Dict[str, str]:
-    """
-    Loads existing alias_map.json (so human edits are preserved), or creates one via LLM.
-    """
-    for map_file in [ALIAS_MAP_FILE_1, ALIAS_MAP_FILE_2]:
-        if map_file.exists() and not force_rebuild:
-            try:
-                with open(map_file, "r", encoding="utf-8") as f:
-                    alias_map = json.load(f)
-                    logger.info(f"Loaded existing alias map from {map_file} ({len(alias_map)} entries)")
-                    return alias_map
-            except Exception as e:
-                logger.warning(f"Error reading existing alias map {map_file}: {e}")
-
-    # Generate new alias map via LLM
-    alias_map = generate_alias_map_with_llm(entity_aliases)
-
-    # Save to disk for human editing
+def _save_alias_map(alias_map: Dict[str, str]) -> None:
+    """Persist the alias map to both output locations."""
     OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
     with open(ALIAS_MAP_FILE_1, "w", encoding="utf-8") as f:
         json.dump(alias_map, f, indent=2, ensure_ascii=False)
-
     try:
         ROOT_OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
         with open(ALIAS_MAP_FILE_2, "w", encoding="utf-8") as f:
@@ -161,6 +171,80 @@ def get_or_create_alias_map(entity_aliases: Dict[str, Set[str]], force_rebuild: 
     except Exception:
         pass
 
+
+def _load_existing_alias_map() -> Dict[str, str]:
+    for map_file in [ALIAS_MAP_FILE_1, ALIAS_MAP_FILE_2]:
+        if map_file.exists():
+            try:
+                with open(map_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                if isinstance(data, dict):
+                    return {
+                        str(k).strip(): str(v).strip()
+                        for k, v in data.items()
+                        if str(k).strip() and str(v).strip()
+                    }
+            except Exception as e:
+                logger.warning(f"Error reading existing alias map {map_file}: {e}")
+    return {}
+
+
+def _unmapped_entities(
+    entity_aliases: Dict[str, Set[str]],
+    alias_map: Dict[str, str],
+) -> List[str]:
+    """Return entities that are neither a map key nor an existing canonical value."""
+    key_set = {normalize_name(k) for k in alias_map}
+    canonical_set = {normalize_name(v) for v in alias_map.values()}
+    return [
+        ent
+        for ent in sorted(entity_aliases)
+        if normalize_name(ent) not in key_set
+        and normalize_name(ent) not in canonical_set
+    ]
+
+
+def get_or_create_alias_map(
+    entity_aliases: Dict[str, Set[str]],
+    force_rebuild: bool = False,
+    use_llm: bool = True,
+) -> Dict[str, str]:
+    """
+    Load an existing alias_map.json (preserving human edits), extending it with
+    any entities that appeared in newly extracted episodes.
+    """
+    existing = {} if force_rebuild else _load_existing_alias_map()
+
+    if existing:
+        novel = _unmapped_entities(entity_aliases, existing)
+        if not novel:
+            logger.info(
+                "Loaded existing alias map (%d entries); all entities are mapped.",
+                len(existing),
+            )
+            return existing
+
+        logger.info(
+            "Alias map is missing %d entit%s; extending it (existing edits preserved).",
+            len(novel),
+            "y" if len(novel) == 1 else "ies",
+        )
+        additions = generate_alias_map_with_llm(
+            {ent: entity_aliases[ent] for ent in novel},
+            use_llm=use_llm,
+        )
+        merged = dict(existing)
+        for key, value in additions.items():
+            merged.setdefault(key, value)
+        # Ensure every newly seen name has a key so it is not reprocessed.
+        for ent in novel:
+            merged.setdefault(ent, additions.get(ent, ent))
+        _save_alias_map(merged)
+        logger.info("Saved extended alias map to %s (%d entries).", ALIAS_MAP_FILE_1, len(merged))
+        return merged
+
+    alias_map = generate_alias_map_with_llm(entity_aliases, use_llm=use_llm)
+    _save_alias_map(alias_map)
     logger.info(f"Saved alias map to {ALIAS_MAP_FILE_1} (editable by hand)")
     return alias_map
 
@@ -172,24 +256,44 @@ def build_series_bible(all_episode_data: List[Dict[str, Any]], alias_map: Dict[s
     """
     bible: Dict[str, Dict[str, List[Dict[str, Any]]]] = defaultdict(lambda: defaultdict(list))
     seen_entries: Set[str] = set()
+    noise_dropped = 0
+
+    # Case-insensitive lookup plus canonical spellings, so a map generated for
+    # episode 1 still resolves "juliana" or "LADY JULIANA" in episode 50.
+    lookup = {normalize_name(k): v for k, v in alias_map.items()}
+    canonical_spelling = {normalize_name(v): v for v in alias_map.values()}
 
     for ep_data in all_episode_data:
         ep_num = ep_data.get("episode", 1)
         facts = ep_data.get("facts", [])
 
         for f in facts:
-            raw_entity = f.get("entity", "").strip()
+            raw_entity = str(f.get("entity", "")).strip()
             if not raw_entity:
                 continue
+            if is_noise_entity(raw_entity):
+                noise_dropped += 1
+                continue
 
-            # Resolve canonical entity name through alias map
-            canonical_entity = alias_map.get(raw_entity, raw_entity)
+            # Resolve canonical entity name through the alias map, then through
+            # any aliases carried by the fact itself.
+            canonical_entity = lookup.get(normalize_name(raw_entity))
+            if not canonical_entity:
+                for alias in clean_aliases(raw_entity, f.get("aliases", [])):
+                    canonical_entity = lookup.get(normalize_name(alias))
+                    if canonical_entity:
+                        break
+            if not canonical_entity:
+                canonical_entity = raw_entity
+            canonical_entity = canonical_spelling.get(
+                normalize_name(canonical_entity), canonical_entity
+            )
 
-            attr = f.get("attribute", "").strip().lower()
-            val = f.get("value", "").strip()
-            quote = f.get("quote", "").strip()
-            ts = f.get("timestamp", "").strip()
-            rel = f.get("reliability", "stated").strip().lower()
+            attr = normalize_attribute(f.get("attribute", ""))
+            val = str(f.get("value", "")).strip()
+            quote = str(f.get("quote", "")).strip()
+            ts = str(f.get("timestamp", "")).strip()
+            rel = str(f.get("reliability", "stated")).strip().lower() or "stated"
 
             if not attr or not val:
                 continue
@@ -219,6 +323,9 @@ def build_series_bible(all_episode_data: List[Dict[str, Any]], alias_map: Dict[s
             sorted_entries = sorted(bible[ent][attr], key=lambda x: (x.get("ep", 0), x.get("timestamp", "")))
             clean_bible[ent][attr] = sorted_entries
 
+    if noise_dropped:
+        logger.info("Dropped %d fact(s) attached to non-character section labels.", noise_dropped)
+
     return clean_bible
 
 
@@ -245,6 +352,11 @@ def main():
         action="store_true",
         help="Re-prompt LLM to propose alias merges even if alias_map.json exists",
     )
+    parser.add_argument(
+        "--no-llm",
+        action="store_true",
+        help="Use rule-based alias merging only (no API calls; useful offline)",
+    )
     args = parser.parse_args()
 
     all_episode_data = load_all_fact_files()
@@ -258,7 +370,11 @@ def main():
     entity_aliases = gather_entities_and_aliases(all_episode_data)
 
     # 2. Build or load alias map
-    alias_map = get_or_create_alias_map(entity_aliases, force_rebuild=args.rebuild_aliases)
+    alias_map = get_or_create_alias_map(
+        entity_aliases,
+        force_rebuild=args.rebuild_aliases,
+        use_llm=not args.no_llm,
+    )
 
     # 3. Build series bible
     bible = build_series_bible(all_episode_data, alias_map)

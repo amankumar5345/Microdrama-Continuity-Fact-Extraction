@@ -3,3 +3,4 @@ model: "nvidia/nemotron-3-ultra-550b-a55b:free"
 api_key_env: "OPENROUTER_API_KEY"
 base_url: "https://openrouter.ai/api/v1" # Used for OpenAI-compatible endpoints
 temperature: 0.0
+timeout_seconds: 60

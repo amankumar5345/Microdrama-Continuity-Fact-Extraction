@@ -16,6 +16,7 @@ Live Precision = accepted / (accepted + rejected)
 """
 
 import hashlib
+import html
 import json
 import logging
 import os
@@ -276,7 +277,19 @@ div[data-testid="stMetric"] {
 # Utilities
 # ─────────────────────────────────────────────────────────────────────────────
 def make_flag_id(row: Dict[str, Any]) -> str:
-    raw = f"{row.get('entity')}|{row.get('attribute')}|{row.get('ep_a')}|{row.get('ep_b')}|{row.get('timestamp_a')}|{row.get('timestamp_b')}"
+    raw = "|".join(
+        str(row.get(field, ""))
+        for field in (
+            "entity",
+            "attribute",
+            "ep_a",
+            "ep_b",
+            "timestamp_a",
+            "timestamp_b",
+            "value_a",
+            "value_b",
+        )
+    )
     return hashlib.md5(raw.encode("utf-8")).hexdigest()[:12]
 
 
@@ -295,6 +308,36 @@ def _safe_int(v: Any, default: int = 1) -> int:
         return int(v)
     except (TypeError, ValueError):
         return default
+
+
+def _esc(value: Any) -> str:
+    """Escape screenplay-derived text before injecting it into unsafe HTML."""
+    return html.escape(str(value if value is not None else ""), quote=True)
+
+
+_NOISE_ENTITY_RE = re.compile(
+    r"^(?:episode|ep|scene)\s*#?\s*\d+$|"
+    r"^(?:timeline|actions?|dialogue|speaker|camera|sound(?:\s*fx)?|"
+    r"script|screenplay|unknown|none|n/?a)$",
+    re.I,
+)
+
+
+def _is_noise_entity_name(name: Any) -> bool:
+    return bool(_NOISE_ENTITY_RE.match(str(name or "").strip()))
+
+
+def _review_counts(df: pd.DataFrame, reviews: Dict[str, Dict[str, Any]]) -> Tuple[int, int, int]:
+    """Count decisions for the flags currently on screen (ignoring stale ids)."""
+    flag_ids = set(df["flag_id"]) if "flag_id" in df.columns else set()
+    accepted = sum(
+        1 for fid in flag_ids if reviews.get(fid, {}).get("decision") == "accepted"
+    )
+    rejected = sum(
+        1 for fid in flag_ids if reviews.get(fid, {}).get("decision") == "rejected"
+    )
+    pending = max(0, len(flag_ids) - accepted - rejected)
+    return accepted, rejected, pending
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -344,21 +387,19 @@ DEMO_RECORDS: List[Dict[str, Any]] = [
 ]
 
 
-@st.cache_data(ttl=30)
-def load_flags_data() -> pd.DataFrame:
+def _read_flag_records_from_disk() -> List[Dict[str, Any]]:
+    """Read real judged flags, preferring judgments.json over the CSV."""
     records: List[Dict[str, Any]] = []
 
-    # 1. Try judgments JSON
     if JUDGMENTS_JSON.exists():
         try:
             with open(JUDGMENTS_JSON, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                if isinstance(data, list) and data:
-                    records = data
+            if isinstance(data, list) and data:
+                records = [r for r in data if isinstance(r, dict)]
         except Exception as exc:
             logging.warning("judgments.json read error: %s", exc)
 
-    # 2. Fall back to flags CSV
     if not records and FLAGS_CSV.exists():
         try:
             csv_df = pd.read_csv(FLAGS_CSV)
@@ -367,24 +408,22 @@ def load_flags_data() -> pd.DataFrame:
         except Exception as exc:
             logging.warning("flags.csv read error: %s", exc)
 
-    # 3. Use demo records only when nothing real is available
-    if not records:
-        records = DEMO_RECORDS.copy()
+    return records
 
-    # Merge real records with demo records (keeping real + demo, deduplicating by entity+attribute+ep pair)
-    # If real records exist, still augment to ≥ 2 items so charts render well
-    if records and records is not DEMO_RECORDS and len(records) < 2:
-        existing_keys = {(r.get("entity"), r.get("attribute")) for r in records}
-        for d in DEMO_RECORDS:
-            if (d["entity"], d["attribute"]) not in existing_keys:
-                records.append(d)
-                if len(records) >= 4:
-                    break
 
-    for r in records:
+def _normalize_flag_records(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    normalized: List[Dict[str, Any]] = []
+    for raw in records:
+        r = dict(raw)
+        r["severity"] = str(r.get("severity") or "LOW").upper()
+        if r["severity"] not in SEVERITY_ORDER:
+            r["severity"] = "LOW"
+        r["verdict"] = str(r.get("verdict") or "unknown").lower()
+        r["status"] = str(
+            r.get("status")
+            or ("FLAG" if r["verdict"] in ("real_error", "unclear") else "FILTERED")
+        ).upper()
         r.setdefault("flag_id", make_flag_id(r))
-        r.setdefault("severity", "LOW")
-        r.setdefault("verdict", "unknown")
         r.setdefault("candidate_type", "value_conflict")
         r.setdefault("ep_a", 1)
         r.setdefault("ep_b", 1)
@@ -397,8 +436,66 @@ def load_flags_data() -> pd.DataFrame:
         r.setdefault("reason", "")
         r.setdefault("timestamp_a", "")
         r.setdefault("timestamp_b", "")
+        normalized.append(r)
+    return normalized
 
-    return pd.DataFrame(records)
+
+@st.cache_data(ttl=30)
+def load_flags_data() -> Tuple[pd.DataFrame, bool]:
+    """
+    Return (flags dataframe, using_demo_data).
+
+    Demo records are only used when no real judged flags exist. They are never
+    merged into real flags, so the review queue cannot show fabricated rows
+    alongside production results.
+    """
+    records = _read_flag_records_from_disk()
+    using_demo = not records
+    if using_demo:
+        records = [dict(record) for record in DEMO_RECORDS]
+
+    return pd.DataFrame(_normalize_flag_records(records)), using_demo
+
+
+@st.cache_data(ttl=30)
+def load_facts_data() -> pd.DataFrame:
+    """Load every extracted fact, tolerating both dict and legacy list schemas."""
+    candidate_dirs = [OUTPUTS_DIR, BASE_DIR.parent / "outputs"]
+    files: List[Path] = []
+    for directory in candidate_dirs:
+        if directory.exists():
+            files = sorted(directory.glob("facts_ep*.json"))
+            if files:
+                break
+
+    rows: List[Dict[str, Any]] = []
+    for facts_file in files:
+        try:
+            data = json.loads(facts_file.read_text(encoding="utf-8"))
+        except Exception as exc:
+            logging.warning("facts file read error %s: %s", facts_file, exc)
+            continue
+
+        file_episode = _episode_number_from_name(facts_file.name) or 0
+        if isinstance(data, dict):
+            episode = _safe_int(data.get("episode", file_episode), file_episode)
+            facts = data.get("facts", [])
+        elif isinstance(data, list):
+            episode = file_episode
+            facts = data
+        else:
+            continue
+
+        for fact in facts:
+            if not isinstance(fact, dict):
+                continue
+            if _is_noise_entity_name(fact.get("entity")):
+                continue
+            row = dict(fact)
+            row["_episode"] = episode
+            rows.append(row)
+
+    return pd.DataFrame(rows)
 
 
 @st.cache_data(ttl=30)
@@ -435,8 +532,10 @@ def load_reviews() -> Dict[str, Dict[str, Any]]:
 
 def save_reviews(reviews: Dict[str, Dict[str, Any]]) -> None:
     OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
-    with open(REVIEWS_JSON, "w", encoding="utf-8") as f:
+    tmp_path = REVIEWS_JSON.with_suffix(".tmp")
+    with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(reviews, f, indent=2, ensure_ascii=False)
+    tmp_path.replace(REVIEWS_JSON)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -470,19 +569,19 @@ def render_sidebar(df: pd.DataFrame, reviews: Dict, bible: Dict) -> None:
 
         # Quick stats
         st.markdown("#### 📊 Quick Stats")
-        total  = len(df)
-        flags  = len(df[df.get("verdict", pd.Series()) == "real_error"]) if "verdict" in df.columns else 0
+        total = len(df)
+        flags = int((df["status"] == "FLAG").sum()) if "status" in df.columns else 0
         entities = len(bible)
-        reviewed = len(reviews)
-        st.metric("Total Candidates", total)
-        st.metric("Real Errors (LLM)", flags if flags else "—")
-        st.metric("Bible Entities", entities)
-        st.metric("Reviewed", reviewed)
+        accepted, rejected, _ = _review_counts(df, reviews)
+        st.metric("Total candidates", total)
+        st.metric("Active flags (LLM)", flags)
+        st.metric("Bible entities", entities)
+        st.metric("Reviewed", accepted + rejected)
 
         st.markdown("---")
 
         # Refresh
-        if st.button("🔄 Refresh Data", use_container_width=True):
+        if st.button("🔄 Refresh Data", width="stretch"):
             st.cache_data.clear()
             st.rerun()
 
@@ -563,15 +662,15 @@ def render_review_tab(df: pd.DataFrame, reviews: Dict[str, Dict]) -> Dict[str, D
 <div class="flag-card">
   <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
     <div>
-      <span class="badge {sev_cls}">{sev}</span>
-      <span class="badge b-purple">{ctype}</span>
-      <span class="badge b-teal">{verdict}</span>
+      <span class="badge {sev_cls}">{_esc(sev)}</span>
+      <span class="badge b-purple">{_esc(ctype)}</span>
+      <span class="badge b-teal">{_esc(verdict)}</span>
     </div>
-    <span class="badge {dec_cls}">● {dec.upper()}</span>
+    <span class="badge {dec_cls}">● {_esc(dec.upper())}</span>
   </div>
-  <div class="flag-title">{entity} <span class="flag-attr">· {attribute}</span></div>
+  <div class="flag-title">{_esc(entity)} <span class="flag-attr">· {_esc(attribute)}</span></div>
   <div class="flag-reason" style="margin-top:8px;">
-    <strong style="color:#64748b;">LLM Verdict:</strong> {reason}
+    <strong style="color:#64748b;">LLM Verdict:</strong> {_esc(reason)}
   </div>
 </div>
 """, unsafe_allow_html=True)
@@ -581,24 +680,24 @@ def render_review_tab(df: pd.DataFrame, reviews: Dict[str, Dict]) -> Dict[str, D
         with qa_col:
             st.markdown(f"""
 <div class="quote-wrap">
-  <div class="quote-label">📍 Episode {ep_a} · {ts_a}</div>
-  <div class="quote-val">Value: {val_a}</div>
-  <div class="quote-box">"{q_a}"</div>
+  <div class="quote-label">📍 Episode {ep_a} · {_esc(ts_a)}</div>
+  <div class="quote-val">Value: {_esc(val_a)}</div>
+  <div class="quote-box">"{_esc(q_a)}"</div>
 </div>
 """, unsafe_allow_html=True)
         with qb_col:
             st.markdown(f"""
 <div class="quote-wrap">
-  <div class="quote-label">📍 Episode {ep_b} · {ts_b}</div>
-  <div class="quote-val">Value: {val_b}</div>
-  <div class="quote-box">"{q_b}"</div>
+  <div class="quote-label">📍 Episode {ep_b} · {_esc(ts_b)}</div>
+  <div class="quote-val">Value: {_esc(val_b)}</div>
+  <div class="quote-box">"{_esc(q_b)}"</div>
 </div>
 """, unsafe_allow_html=True)
 
         # Action buttons
         btn1, btn2, btn3, _ = st.columns([1.4, 1.4, 1, 6])
         with btn1:
-            if st.button("✅ Accept", key=f"acc_{fid}", use_container_width=True):
+            if st.button("✅ Accept", key=f"acc_{fid}", width="stretch"):
                 reviews[fid] = {
                     "decision": "accepted",
                     "reviewed_at": datetime.now().isoformat(),
@@ -608,7 +707,7 @@ def render_review_tab(df: pd.DataFrame, reviews: Dict[str, Dict]) -> Dict[str, D
                 save_reviews(reviews)
                 st.rerun()
         with btn2:
-            if st.button("❌ Reject", key=f"rej_{fid}", use_container_width=True):
+            if st.button("❌ Reject", key=f"rej_{fid}", width="stretch"):
                 reviews[fid] = {
                     "decision": "rejected",
                     "reviewed_at": datetime.now().isoformat(),
@@ -619,7 +718,7 @@ def render_review_tab(df: pd.DataFrame, reviews: Dict[str, Dict]) -> Dict[str, D
                 st.rerun()
         with btn3:
             if dec != "pending":
-                if st.button("↩ Reset", key=f"rst_{fid}", use_container_width=True):
+                if st.button("↩ Reset", key=f"rst_{fid}", width="stretch"):
                     reviews.pop(fid, None)
                     save_reviews(reviews)
                     st.rerun()
@@ -670,7 +769,7 @@ def render_analytics_tab(df: pd.DataFrame, reviews: Dict) -> None:
             )
             fig.update_layout(**PLOT_LAYOUT, showlegend=True,
                               legend=dict(orientation="h", y=-0.15))
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
     with col2:
         st.markdown("##### Entity Risk Leaderboard")
@@ -689,7 +788,7 @@ def render_analytics_tab(df: pd.DataFrame, reviews: Dict) -> None:
                 xaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.07)"),
                 coloraxis_showscale=False,
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
     # ── Row 2: Review Progress Gauge + Verdict Breakdown ────────────────────
     col3, col4 = st.columns(2)
@@ -722,7 +821,7 @@ def render_analytics_tab(df: pd.DataFrame, reviews: Dict) -> None:
             number={"suffix": "%", "font": {"color": "#e2e8f0", "size": 36}},
         ))
         fig_gauge.update_layout(**PLOT_LAYOUT, height=280)
-        st.plotly_chart(fig_gauge, use_container_width=True)
+        st.plotly_chart(fig_gauge, width="stretch")
 
         # Mini progress bar row
         prog_cols = st.columns(3)
@@ -755,7 +854,7 @@ def render_analytics_tab(df: pd.DataFrame, reviews: Dict) -> None:
                 xaxis=dict(showgrid=False),
                 yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.07)"),
             )
-            st.plotly_chart(fig_v, use_container_width=True)
+            st.plotly_chart(fig_v, width="stretch")
 
     # ── Row 3: Arc Timeline ──────────────────────────────────────────────────
     st.markdown("##### Cross-Episode Contradiction Arc Map")
@@ -777,11 +876,11 @@ def render_analytics_tab(df: pd.DataFrame, reviews: Dict) -> None:
                 line=dict(color=color, width=2.5, shape="spline"),
                 name=f"{r.get('entity')} ({sev})",
                 hovertemplate=(
-                    f"<b>{r.get('entity')}</b><br>"
-                    f"Attribute: {r.get('attribute')}<br>"
+                    f"<b>{_esc(r.get('entity'))}</b><br>"
+                    f"Attribute: {_esc(r.get('attribute'))}<br>"
                     f"Ep {ea} → Ep {eb}<br>"
-                    f"Severity: {sev}<br>"
-                    f"Verdict: {r.get('verdict')}<extra></extra>"
+                    f"Severity: {_esc(sev)}<br>"
+                    f"Verdict: {_esc(r.get('verdict'))}<extra></extra>"
                 ),
             ))
             # Dot markers at endpoints
@@ -818,7 +917,7 @@ def render_analytics_tab(df: pd.DataFrame, reviews: Dict) -> None:
                 bgcolor="rgba(0,0,0,0)",
             ),
         )
-        st.plotly_chart(fig_arc, use_container_width=True)
+        st.plotly_chart(fig_arc, width="stretch")
     else:
         st.info("No episode data available to draw arc map.")
 
@@ -836,7 +935,7 @@ def render_analytics_tab(df: pd.DataFrame, reviews: Dict) -> None:
         fig_ct.update_traces(textposition="outside")
         fig_ct.update_layout(**PLOT_LAYOUT, showlegend=False,
                               yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.07)"))
-        st.plotly_chart(fig_ct, use_container_width=True)
+        st.plotly_chart(fig_ct, width="stretch")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -862,12 +961,16 @@ def render_bible_tab(bible: Dict[str, Any], alias_map: Dict[str, str]) -> None:
         selected = st.selectbox("Select Character / Entity", filtered_entities)
 
     # Alias card
-    canonical_aliases = [k for k, v in alias_map.items() if v == selected]
+    canonical_aliases = [
+        k
+        for k, v in alias_map.items()
+        if k != selected and v.strip().lower() == selected.strip().lower()
+    ]
     if canonical_aliases:
         st.markdown(
             f'<div style="margin-bottom:12px;">'
             f'<span style="color:#64748b; font-size:0.82rem;">Also known as:</span> '
-            + " ".join(f'<span class="badge b-teal">{a}</span>' for a in canonical_aliases)
+            + " ".join(f'<span class="badge b-teal">{_esc(a)}</span>' for a in canonical_aliases)
             + "</div>",
             unsafe_allow_html=True,
         )
@@ -888,12 +991,12 @@ def render_bible_tab(bible: Dict[str, Any], alias_map: Dict[str, str]) -> None:
                 st.markdown(f"""
 <div class="attr-entry">
   <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px; flex-wrap:wrap;">
-    <span class="badge b-purple">Ep {ep}</span>
-    <span style="font-size:0.8rem; color:#475569;">[{ts}]</span>
-    <span class="badge" style="background:rgba(0,0,0,0.3); color:{rel_color}; border:1px solid {rel_color}40;">{rel}</span>
-    <span style="font-size:0.9rem; font-weight:600; color:#e2e8f0;">{val}</span>
+    <span class="badge b-purple">Ep {_esc(ep)}</span>
+    <span style="font-size:0.8rem; color:#475569;">[{_esc(ts)}]</span>
+    <span class="badge" style="background:rgba(0,0,0,0.3); color:{rel_color}; border:1px solid {rel_color}40;">{_esc(rel)}</span>
+    <span style="font-size:0.9rem; font-weight:600; color:#e2e8f0;">{_esc(val)}</span>
   </div>
-  <div class="quote-box">"{quote}"</div>
+  <div class="quote-box">"{_esc(quote)}"</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -907,7 +1010,7 @@ def render_bible_tab(bible: Dict[str, Any], alias_map: Dict[str, str]) -> None:
         overview_rows.append({"Entity": ent, "Attributes": len(attrs), "Total Facts": total_facts, "Tracked": attr_list})
     st.dataframe(
         pd.DataFrame(overview_rows).sort_values("Total Facts", ascending=False),
-        use_container_width=True,
+        width="stretch",
         height=320,
     )
 
@@ -937,7 +1040,7 @@ def render_export_tab(df: pd.DataFrame, reviews: Dict) -> None:
             data=csv_bytes,
             file_name="continuity_flags_reviewed.csv",
             mime="text/csv",
-            use_container_width=True,
+            width="stretch",
         )
     with dl2:
         st.download_button(
@@ -945,7 +1048,7 @@ def render_export_tab(df: pd.DataFrame, reviews: Dict) -> None:
             data=json_bytes,
             file_name="continuity_judgments.json",
             mime="application/json",
-            use_container_width=True,
+            width="stretch",
         )
     with dl3:
         st.download_button(
@@ -953,7 +1056,7 @@ def render_export_tab(df: pd.DataFrame, reviews: Dict) -> None:
             data=reviews_bytes,
             file_name="reviews.json",
             mime="application/json",
-            use_container_width=True,
+            width="stretch",
         )
 
     st.markdown("---")
@@ -975,7 +1078,7 @@ def render_export_tab(df: pd.DataFrame, reviews: Dict) -> None:
         "severity", "user_decision", "verdict", "entity", "attribute",
         "ep_a", "timestamp_a", "ep_b", "timestamp_b", "reason"
     ] if c in export_df.columns]
-    st.dataframe(export_df[preview_cols], use_container_width=True, height=360)
+    st.dataframe(export_df[preview_cols], width="stretch", height=360)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -991,7 +1094,7 @@ def _run_stage(cmd: List[str], cwd: Path, placeholder) -> Tuple[int, str]:
             cwd=str(cwd),
             capture_output=True,
             text=True,
-            timeout=300,
+            timeout=600,
             encoding="utf-8",
             errors="replace",
         )
@@ -999,7 +1102,7 @@ def _run_stage(cmd: List[str], cwd: Path, placeholder) -> Tuple[int, str]:
         placeholder.code(output[-3000:] if len(output) > 3000 else output, language="")
         return result.returncode, output
     except subprocess.TimeoutExpired:
-        placeholder.error("⏱ Stage timed out after 5 min.")
+        placeholder.error("⏱ Stage timed out after 10 min.")
         return -1, "Timeout"
     except Exception as exc:
         placeholder.error(f"Error: {exc}")
@@ -1055,7 +1158,7 @@ def render_upload_tab() -> None:
             col_name, col_num = st.columns([3, 1])
             with col_name:
                 st.markdown(
-                    f'<span style="font-size:0.9rem; color:#e2e8f0;">📄 {uf.name}'
+                    f'<span style="font-size:0.9rem; color:#e2e8f0;">📄 {_esc(uf.name)}'
                     f' <span style="color:#64748b;">({uf.size:,} bytes)</span></span>',
                     unsafe_allow_html=True,
                 )
@@ -1069,7 +1172,7 @@ def render_upload_tab() -> None:
             used_nums.add(int(ep_num))
 
         # Save button
-        if st.button("💾 Save Files to data/", type="primary", use_container_width=False):
+        if st.button("💾 Save Files to data/", type="primary", width="content"):
             DATA_DIR.mkdir(parents=True, exist_ok=True)
             saved = []
             for uf in uploaded_files:
@@ -1101,7 +1204,7 @@ def render_upload_tab() -> None:
                 "Facts Extracted": extracted,
             })
         ep_df = pd.DataFrame(rows)
-        st.dataframe(ep_df, use_container_width=True, height=min(40 + len(rows) * 35, 400))
+        st.dataframe(ep_df, width="stretch", height=min(40 + len(rows) * 35, 400))
 
         # Correlation / coverage bar chart
         st.markdown("#### Episode Size Distribution")
@@ -1119,7 +1222,7 @@ def render_upload_tab() -> None:
             showlegend=True,
             legend=dict(orientation="h", y=1.1),
         )
-        st.plotly_chart(fig_size, use_container_width=True)
+        st.plotly_chart(fig_size, width="stretch")
     else:
         st.info("No episode files found in `continuity/data/`. Upload some files above.")
 
@@ -1240,14 +1343,18 @@ def render_upload_tab() -> None:
             ("Detect",  [sys.executable, "-m", "continuity.detect"]),
             ("Judge",   [sys.executable, "-m", "continuity.judge"]),
         ]
-        # Insert extract stages per episode
+        # Insert extract stages per episode (continuity/data first, then root data)
+        data_files: List[Path] = []
+        for data_dir in (DATA_DIR, BASE_DIR.parent / "data"):
+            if data_dir.exists():
+                data_files.extend(data_dir.glob("episode_*.txt"))
         all_eps = sorted(
-            set(
-                _episode_number_from_name(f.name)
-                for f in existing
-                if _episode_number_from_name(f.name) is not None
-            )
-        ) if existing else []
+            {
+                number
+                for number in (_episode_number_from_name(f.name) for f in data_files)
+                if number is not None
+            }
+        )
         all_stages = [stages[0]]  # Parse first
         for ep_n in all_eps:
             all_stages.append(
@@ -1275,125 +1382,112 @@ def render_upload_tab() -> None:
     st.markdown("### 🔗 Episode Correlation Explorer")
     st.caption("Explore which episodes share the same entities and attributes — before running the judge.")
 
-    facts_files = sorted(OUTPUTS_DIR.glob("facts_ep*.json"))
-    if not facts_files:
+    facts_df = load_facts_data()
+    if facts_df.empty:
         st.info("No facts extracted yet. Run **Stage 2 · Extract Facts** first.")
     else:
-        # Load all facts
-        all_facts: List[Dict] = []
-        for ff in facts_files:
-            try:
-                ep_n = _episode_number_from_name(ff.name) or 0
-                data = json.loads(ff.read_text(encoding="utf-8"))
-                for rec in data:
-                    rec["_episode"] = ep_n
-                all_facts.extend(data)
-            except Exception:
-                pass
+        facts_df = facts_df.copy()
+        facts_df["_episode"] = facts_df["_episode"].astype(int)
 
-        if all_facts:
-            facts_df = pd.DataFrame(all_facts)
-            facts_df["_episode"] = facts_df["_episode"].astype(int)
-
-            col_a, col_b = st.columns(2)
-            with col_a:
-                st.markdown("#### Facts per Episode")
-                ep_fact_counts = facts_df.groupby("_episode").size().reset_index(name="Fact Count")
-                fig_epc = px.bar(
-                    ep_fact_counts, x="_episode", y="Fact Count",
-                    labels={"_episode": "Episode"},
-                    color="Fact Count",
-                    color_continuous_scale=[[0, "#3b82f6"], [1, "#6366f1"]],
-                )
-                fig_epc.update_layout(**PLOT_LAYOUT, coloraxis_showscale=False,
-                                       xaxis=dict(tickformat="d", dtick=1))
-                st.plotly_chart(fig_epc, use_container_width=True)
-
-            with col_b:
-                st.markdown("#### Top Entities Across Episodes")
-                if "entity" in facts_df.columns:
-                    ent_ep = facts_df.groupby("entity")["_episode"].nunique().reset_index()
-                    ent_ep.columns = ["Entity", "Episodes Mentioned"]
-                    ent_ep = ent_ep.sort_values("Episodes Mentioned", ascending=False).head(12)
-                    fig_ent = px.bar(
-                        ent_ep, x="Episodes Mentioned", y="Entity",
-                        orientation="h",
-                        color="Episodes Mentioned",
-                        color_continuous_scale=[[0, "#14b8a6"], [1, "#6366f1"]],
-                    )
-                    fig_ent.update_layout(**PLOT_LAYOUT, coloraxis_showscale=False,
-                                          yaxis=dict(autorange="reversed"))
-                    st.plotly_chart(fig_ent, use_container_width=True)
-
-            # Cross-episode entity heatmap
-            if "entity" in facts_df.columns:
-                st.markdown("#### Entity × Episode Heatmap (presence = number of facts)")
-                top_entities = facts_df["entity"].value_counts().head(15).index.tolist()
-                ep_range    = sorted(facts_df["_episode"].unique())
-                heat_data   = facts_df[facts_df["entity"].isin(top_entities)]
-                heat_pivot  = (
-                    heat_data.groupby(["entity", "_episode"])
-                    .size()
-                    .unstack(fill_value=0)
-                    .reindex(columns=ep_range, fill_value=0)
-                )
-                fig_heat = px.imshow(
-                    heat_pivot,
-                    labels=dict(x="Episode", y="Entity", color="# Facts"),
-                    color_continuous_scale="Blues",
-                    aspect="auto",
-                )
-                fig_heat.update_layout(
-                    **PLOT_LAYOUT,
-                    height=max(300, len(top_entities) * 32),
-                    xaxis=dict(tickformat="d"),
-                )
-                st.plotly_chart(fig_heat, use_container_width=True)
-
-            # Attribute distribution
-            if "attribute" in facts_df.columns:
-                st.markdown("#### Most-Tracked Attributes")
-                attr_counts = facts_df["attribute"].value_counts().head(15).reset_index()
-                attr_counts.columns = ["Attribute", "Count"]
-                fig_attr = px.bar(
-                    attr_counts, x="Count", y="Attribute", orientation="h",
-                    color="Count",
-                    color_continuous_scale=[[0, "#f59e0b"], [1, "#ef4444"]],
-                )
-                fig_attr.update_layout(**PLOT_LAYOUT, coloraxis_showscale=False,
-                                        yaxis=dict(autorange="reversed"))
-                st.plotly_chart(fig_attr, use_container_width=True)
-
-            # Raw facts table with filters
-            st.markdown("#### 🔎 Browse Raw Facts")
-            fc1, fc2, fc3 = st.columns([2, 2, 3])
-            with fc1:
-                ep_filter = st.multiselect(
-                    "Episode", sorted(facts_df["_episode"].unique()),
-                    default=[], key="facts_ep_filter"
-                )
-            with fc2:
-                ent_opts = ["ALL"] + sorted(facts_df["entity"].dropna().unique()) if "entity" in facts_df.columns else ["ALL"]
-                ent_filter = st.selectbox("Entity", ent_opts, key="facts_ent_filter")
-            with fc3:
-                attr_opts = ["ALL"] + sorted(facts_df["attribute"].dropna().unique()) if "attribute" in facts_df.columns else ["ALL"]
-                attr_filter = st.selectbox("Attribute", attr_opts, key="facts_attr_filter")
-
-            view_df = facts_df.copy()
-            if ep_filter:
-                view_df = view_df[view_df["_episode"].isin(ep_filter)]
-            if ent_filter != "ALL" and "entity" in view_df.columns:
-                view_df = view_df[view_df["entity"] == ent_filter]
-            if attr_filter != "ALL" and "attribute" in view_df.columns:
-                view_df = view_df[view_df["attribute"] == attr_filter]
-
-            display_cols = [c for c in ["_episode", "entity", "attribute", "value", "timestamp", "reliability", "quote"] if c in view_df.columns]
-            st.dataframe(
-                view_df[display_cols].rename(columns={"_episode": "Episode"}),
-                use_container_width=True,
-                height=380,
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.markdown("#### Facts per Episode")
+            ep_fact_counts = facts_df.groupby("_episode").size().reset_index(name="Fact Count")
+            fig_epc = px.bar(
+                ep_fact_counts, x="_episode", y="Fact Count",
+                labels={"_episode": "Episode"},
+                color="Fact Count",
+                color_continuous_scale=[[0, "#3b82f6"], [1, "#6366f1"]],
             )
-            st.caption(f"Showing {len(view_df)} of {len(facts_df)} facts")
+            fig_epc.update_layout(**PLOT_LAYOUT, coloraxis_showscale=False,
+                                   xaxis=dict(tickformat="d", dtick=1))
+            st.plotly_chart(fig_epc, width="stretch")
+
+        with col_b:
+            st.markdown("#### Top Entities Across Episodes")
+            if "entity" in facts_df.columns:
+                ent_ep = facts_df.groupby("entity")["_episode"].nunique().reset_index()
+                ent_ep.columns = ["Entity", "Episodes Mentioned"]
+                ent_ep = ent_ep.sort_values("Episodes Mentioned", ascending=False).head(12)
+                fig_ent = px.bar(
+                    ent_ep, x="Episodes Mentioned", y="Entity",
+                    orientation="h",
+                    color="Episodes Mentioned",
+                    color_continuous_scale=[[0, "#14b8a6"], [1, "#6366f1"]],
+                )
+                fig_ent.update_layout(**PLOT_LAYOUT, coloraxis_showscale=False,
+                                      yaxis=dict(autorange="reversed"))
+                st.plotly_chart(fig_ent, width="stretch")
+
+        # Cross-episode entity heatmap
+        if "entity" in facts_df.columns:
+            st.markdown("#### Entity × Episode Heatmap (presence = number of facts)")
+            top_entities = facts_df["entity"].value_counts().head(15).index.tolist()
+            ep_range    = sorted(facts_df["_episode"].unique())
+            heat_data   = facts_df[facts_df["entity"].isin(top_entities)]
+            heat_pivot  = (
+                heat_data.groupby(["entity", "_episode"])
+                .size()
+                .unstack(fill_value=0)
+                .reindex(columns=ep_range, fill_value=0)
+            )
+            fig_heat = px.imshow(
+                heat_pivot,
+                labels=dict(x="Episode", y="Entity", color="# Facts"),
+                color_continuous_scale="Blues",
+                aspect="auto",
+            )
+            fig_heat.update_layout(
+                **PLOT_LAYOUT,
+                height=max(300, len(top_entities) * 32),
+                xaxis=dict(tickformat="d"),
+            )
+            st.plotly_chart(fig_heat, width="stretch")
+
+        # Attribute distribution
+        if "attribute" in facts_df.columns:
+            st.markdown("#### Most-Tracked Attributes")
+            attr_counts = facts_df["attribute"].value_counts().head(15).reset_index()
+            attr_counts.columns = ["Attribute", "Count"]
+            fig_attr = px.bar(
+                attr_counts, x="Count", y="Attribute", orientation="h",
+                color="Count",
+                color_continuous_scale=[[0, "#f59e0b"], [1, "#ef4444"]],
+            )
+            fig_attr.update_layout(**PLOT_LAYOUT, coloraxis_showscale=False,
+                                    yaxis=dict(autorange="reversed"))
+            st.plotly_chart(fig_attr, width="stretch")
+
+        # Raw facts table with filters
+        st.markdown("#### 🔎 Browse Raw Facts")
+        fc1, fc2, fc3 = st.columns([2, 2, 3])
+        with fc1:
+            ep_filter = st.multiselect(
+                "Episode", sorted(facts_df["_episode"].unique()),
+                default=[], key="facts_ep_filter"
+            )
+        with fc2:
+            ent_opts = ["ALL"] + sorted(facts_df["entity"].dropna().unique()) if "entity" in facts_df.columns else ["ALL"]
+            ent_filter = st.selectbox("Entity", ent_opts, key="facts_ent_filter")
+        with fc3:
+            attr_opts = ["ALL"] + sorted(facts_df["attribute"].dropna().unique()) if "attribute" in facts_df.columns else ["ALL"]
+            attr_filter = st.selectbox("Attribute", attr_opts, key="facts_attr_filter")
+
+        view_df = facts_df.copy()
+        if ep_filter:
+            view_df = view_df[view_df["_episode"].isin(ep_filter)]
+        if ent_filter != "ALL" and "entity" in view_df.columns:
+            view_df = view_df[view_df["entity"] == ent_filter]
+        if attr_filter != "ALL" and "attribute" in view_df.columns:
+            view_df = view_df[view_df["attribute"] == attr_filter]
+
+        display_cols = [c for c in ["_episode", "entity", "attribute", "value", "timestamp", "reliability", "quote"] if c in view_df.columns]
+        st.dataframe(
+            view_df[display_cols].rename(columns={"_episode": "Episode"}),
+            width="stretch",
+            height=380,
+        )
+        st.caption(f"Showing {len(view_df)} of {len(facts_df)} facts")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1401,14 +1495,14 @@ def render_upload_tab() -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 def main() -> None:
     # Load all data
-    df      = load_flags_data()
+    df, using_demo = load_flags_data()
     reviews = load_reviews()
-    bible   = load_bible_data()
+    bible = load_bible_data()
     aliases = load_alias_data()
+    facts_df = load_facts_data()
 
-    # Compute precision
-    accepted = sum(1 for r in reviews.values() if r.get("decision") == "accepted")
-    rejected = sum(1 for r in reviews.values() if r.get("decision") == "rejected")
+    # Compute precision over the flags currently loaded (ignore stale review ids).
+    accepted, rejected, pending_count = _review_counts(df, reviews)
     reviewed = accepted + rejected
     precision_pct = (accepted / reviewed * 100) if reviewed > 0 else None
 
@@ -1416,12 +1510,8 @@ def main() -> None:
     render_sidebar(df, reviews, bible)
 
     # ── Hero Banner ──────────────────────────────────────────────────────────
-    ep_facts = sum(1 for _ in OUTPUTS_DIR.glob("facts_ep*.json")) if OUTPUTS_DIR.exists() else 0
-    total_facts = sum(
-        len(json.load(open(f, encoding="utf-8")))
-        for f in OUTPUTS_DIR.glob("facts_ep*.json")
-        if f.exists()
-    ) if OUTPUTS_DIR.exists() else 0
+    ep_facts = int(facts_df["_episode"].nunique()) if not facts_df.empty else 0
+    total_facts = len(facts_df)
 
     prec_display = f"{precision_pct:.1f}%" if precision_pct is not None else "—"
     prec_color   = "#10b981" if (precision_pct or 0) >= 70 else "#f59e0b" if (precision_pct or 0) >= 40 else "#ef4444"
@@ -1442,12 +1532,18 @@ def main() -> None:
 </div>
 """, unsafe_allow_html=True)
 
+    if using_demo:
+        st.info(
+            "No judged flags were found, so the app is showing built-in demo data. "
+            "Run the parse → extract → bible → detect → judge pipeline to review real results.",
+            icon=":material/science:",
+        )
+
     # ── KPI Row ──────────────────────────────────────────────────────────────
     kc1, kc2, kc3, kc4, kc5 = st.columns(5)
     total_flags = len(df)
-    pending_count = max(0, total_flags - reviewed)
 
-    kc1.metric("🚩 Total Flags",         total_flags)
+    kc1.metric("🚩 Total flags", total_flags)
     kc2.metric("✅ Accepted",            accepted)
     kc3.metric("❌ Rejected",            rejected)
     kc4.metric("⏳ Pending",             pending_count)

@@ -7,8 +7,14 @@ Tests call_llm() with a trivial prompt:
 - Verifies caching in data/cache.json
 """
 
+import sys
 import time
 from pathlib import Path
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
 from continuity.llm import call_llm, CACHE_PATH
 
 def test_trivial_call():

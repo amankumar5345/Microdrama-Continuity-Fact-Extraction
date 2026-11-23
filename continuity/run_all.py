@@ -15,6 +15,7 @@ Prints a clear summary of:
 - Flags kept (real_error & unclear vs filtered)
 """
 
+import re
 import sys
 import time
 import argparse
@@ -50,13 +51,31 @@ from continuity.judge import (
     FLAGS_CSV_1,
     JUDGMENTS_JSON_1,
 )
+from continuity.textutil import enable_utf8_console
 
+enable_utf8_console()
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     datefmt="%H:%M:%S",
 )
 logger = logging.getLogger("run_all")
+
+
+def discover_episode_numbers() -> List[int]:
+    """Find every episode number available in continuity/data (or root data)."""
+    candidate_dirs = [PARSE_DATA_DIR, ROOT_DIR / "data"]
+    for directory in candidate_dirs:
+        if not directory.exists():
+            continue
+        numbers = set()
+        for path in directory.glob("*.txt"):
+            match = re.search(r"(\d+)", path.name)
+            if match:
+                numbers.add(int(match.group(1)))
+        if numbers:
+            return sorted(numbers)
+    return []
 
 
 def parse_arguments():
@@ -140,7 +159,9 @@ def run_pipeline(
     total_quotes_dropped = 0
 
     if not skip_extract:
-        target_episodes = eps or [1, 2]
+        target_episodes = sorted(set(eps)) if eps else discover_episode_numbers()
+        if not target_episodes:
+            logger.warning("No episode files found; skipping extraction.")
         for ep_num in target_episodes:
             screenplay_path = find_screenplay_file(ep_num)
             if not screenplay_path:
@@ -148,6 +169,8 @@ def run_pipeline(
                 continue
 
             res = extract_episode(ep_num, screenplay_path)
+            if res.get("error"):
+                logger.error("Episode %d extraction failed: %s", ep_num, res["error"])
             total_facts_extracted += res.get("facts_count", 0)
             total_quotes_dropped += res.get("dropped_count", 0)
     else:
@@ -204,7 +227,9 @@ def run_pipeline(
         export_flags_csv(judged_records, FLAGS_CSV_1)
         export_judgments_json(judged_records, JUDGMENTS_JSON_1)
     else:
-        logger.info("No candidates to judge.")
+        logger.info("No candidates to judge. Writing empty flag artifacts.")
+        export_flags_csv([], FLAGS_CSV_1)
+        export_judgments_json([], JUDGMENTS_JSON_1)
 
     duration = time.time() - start_time
 
@@ -237,7 +262,7 @@ def run_pipeline(
     print("=" * 70 + "\n")
 
 
-if __name__ == "__main__":
+def main() -> None:
     args = parse_arguments()
     run_pipeline(
         eps=args.eps,
@@ -245,3 +270,7 @@ if __name__ == "__main__":
         skip_extract=args.skip_extract,
         rebuild_aliases=args.rebuild_aliases,
     )
+
+
+if __name__ == "__main__":
+    main()

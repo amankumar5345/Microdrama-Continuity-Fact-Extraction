@@ -63,9 +63,78 @@ def _clean_json_response(raw_resp: str) -> str:
     return text.strip()
 
 
-def extract_facts_from_episode(episode: Episode, save_to_disk: bool = True) -> List[Fact]:
+def _load_cached_facts(facts_file: Path, episode: Episode) -> List[Fact]:
+    """
+    Load cached facts and re-verify every quote against the current screenplay.
+
+    Caches can outlive the file they were extracted from (or be produced by an
+    older parser), so a cached quote is never trusted blindly.
+    """
+    with open(facts_file, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    raw_facts = data.get("facts", [])
+    facts: List[Fact] = []
+    invalid = 0
+
+    for item in raw_facts:
+        if not isinstance(item, dict):
+            invalid += 1
+            continue
+        try:
+            fact = Fact(
+                entity=str(item.get("entity", "")).strip(),
+                aliases=item.get("aliases", []) if isinstance(item.get("aliases", []), list) else [],
+                category=str(item.get("category", "status")).strip(),
+                attribute=str(item.get("attribute", "")).strip().lower(),
+                value=str(item.get("value", "")).strip(),
+                reliability=str(item.get("reliability", "stated")).strip(),
+                timestamp=str(item.get("timestamp", "")).strip(),
+                quote=str(item.get("quote", "")).strip(),
+                episode=int(item.get("episode", episode.number)),
+                scene=item.get("scene"),
+            )
+        except Exception:
+            invalid += 1
+            continue
+
+        if not fact.entity or not fact.quote or not verify_quote_in_screenplay(fact.quote, episode.raw_text):
+            invalid += 1
+            logger.warning(f"Dropping cached fact with unverifiable quote: {fact.quote!r}")
+            continue
+        facts.append(fact)
+
+    if invalid:
+        logger.warning(
+            "Revalidation removed %d of %d cached fact(s) from %s.",
+            invalid,
+            len(raw_facts),
+            facts_file.name,
+        )
+        try:
+            data["facts"] = [fact.to_dict() for fact in facts]
+            data["facts_count"] = len(facts)
+            data["dropped_count"] = int(data.get("dropped_count", 0)) + invalid
+            with open(facts_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            logger.warning(f"Failed to rewrite revalidated facts file {facts_file}: {e}")
+
+    return facts
+
+
+def extract_facts_from_episode(
+    episode: Episode,
+    save_to_disk: bool = True,
+    force_refresh: bool = False,
+) -> List[Fact]:
     """
     Extracts, validates, and grounds continuity facts from an episode screenplay.
+
+    Args:
+        episode: Parsed episode.
+        save_to_disk: Persist verified facts to data/facts/.
+        force_refresh: Ignore an existing cache and call the LLM again.
     """
     config = load_config()
     strict_quote_check = config.get("checker", {}).get("strict_quote_verification", True)
@@ -74,14 +143,12 @@ def extract_facts_from_episode(episode: Episode, save_to_disk: bool = True) -> L
     facts_dir.mkdir(parents=True, exist_ok=True)
     facts_file = facts_dir / f"episode_{episode.number:03d}_facts.json"
 
-    # Check if facts are already extracted and cached on disk
-    if facts_file.exists():
+    # Check if facts are already extracted and cached on disk.
+    if facts_file.exists() and not force_refresh:
         try:
-            with open(facts_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                facts = [Fact(**item) for item in data.get("facts", [])]
-                logger.info(f"Loaded {len(facts)} cached facts from {facts_file.name}")
-                return facts
+            facts = _load_cached_facts(facts_file, episode)
+            logger.info(f"Loaded {len(facts)} revalidated cached facts from {facts_file.name}")
+            return facts
         except Exception as e:
             logger.warning(f"Failed to read existing facts file {facts_file}: {e}")
 

@@ -1,190 +1,178 @@
-# 🎬 Continuity Checker for Serialized Microdramas
+# Continuity Checker for Serialized Microdramas
 
-An enterprise-grade, deterministic Python system designed to audit serialized microdrama screenplays (up to 50 episodes with timestamps per scene and line). It extracts verifiable narrative facts, builds a canonical series bible, detects cross-episode contradictions via two-pass scanning, classifies discrepancies via LLM judgment, and presents an interactive human-in-the-loop review studio in Streamlit.
+The primary continuity pipeline: parse 50 timestamped screenplays, extract verified
+facts, build a canonical Series Bible, detect cross-episode contradictions, judge
+them with an LLM, and review flags in a Streamlit studio.
 
----
-
-## 🌟 Key Architecture
-
-```
-MicroDrama - Fix/
-├── continuity/
-│   ├── config.yaml          # LLM provider, model, API key env, base_url, temp=0.0
-│   ├── llm.py               # call_llm(prompt, json_mode=True) with SHA-256 disk cache & retry
-│   ├── parse.py             # Screenplay parser handling timestamps, scenes, dialogue & actions
-│   ├── extract.py           # Fact extractor with strict verbatim quote verification
-│   ├── bible.py             # Series Bible builder with LLM canonical alias normalization
-│   ├── detect.py            # Two-pass detector (Pass 1: Value Conflicts, Pass 2: State Errors)
-│   ├── judge.py             # Severity ranker & classifier (real_error vs legit_change)
-│   ├── app.py               # Interactive Streamlit Web Studio with live precision & Plotly charts
-│   ├── prompts/
-│   │   ├── extract.txt      # Prompt template for fact extraction
-│   │   └── judge.txt        # Prompt template for contradiction judgment
-│   ├── data/
-│   │   ├── cache.json       # Deterministic LLM response cache ($0 token cost on reruns)
-│   │   ├── episodes.json    # Structured screenplay lines with timestamps
-│   │   └── *.txt            # Timestamped screenplay files (episodes 1 to 50)
-│   └── outputs/
-│       ├── facts_epN.json   # Verified facts extracted per episode
-│       ├── alias_map.json   # Canonical name mapping (human-editable)
-│       ├── bible.json       # Series Bible (entity -> attribute -> chronological facts)
-│       ├── candidates.json  # Candidate contradiction pairs
-│       ├── flags.csv        # Reviewed flags table sorted by severity
-│       ├── judgments.json   # Machine-readable contradiction judgments
-│       └── reviews.json     # Human audit decisions (accepted / rejected)
-├── run_all.py               # One-click pipeline runner orchestrating stages 1 through 5
-├── requirements.txt         # Minimal dependencies (pyyaml, requests, python-dotenv, streamlit, plotly)
-└── .env                     # API keys configuration
-```
+See the repository root `README.md` for the full project overview (including the
+legacy `src/` prototype) and setup instructions.
 
 ---
 
-## 🚀 Setup & Installation
+## Pipeline
 
-### 1. Prerequisites
-- Python 3.10+ (tested on Python 3.11)
-- Install minimal dependencies:
-```bash
-pip install -r requirements.txt
+```text
+data/*.txt
+  -> parse.py    -> data/episodes.json
+  -> extract.py  -> outputs/facts_epN.json       (verbatim quote gate)
+  -> bible.py    -> outputs/alias_map.json + bible.json
+  -> detect.py   -> outputs/candidates.json      (Pass 1 + Pass 2)
+  -> judge.py    -> outputs/flags.csv + judgments.json
+  -> app.py      -> outputs/reviews.json         (human review)
 ```
 
-### 2. Configure API Key
-Create or edit `.env` in the project root:
-```bash
-# Example for OpenRouter (Free-tier models supported out of the box)
-OPENROUTER_API_KEY=sk-or-v1-...
+All current-pipeline outputs are also mirrored to the repository root `outputs/`.
 
-# Or for Gemini:
-# GEMINI_API_KEY=AIzaSy...
+### 1. Parse
 
-# Or for OpenAI:
-# OPENAI_API_KEY=sk-...
-```
-
-Review `continuity/config.yaml` to adjust the model if desired:
-```yaml
-provider: "openai" # "openai" (covers OpenRouter, Groq, OpenAI) or "gemini"
-model: "nvidia/nemotron-3-ultra-550b-a55b:free" # 100% Free on OpenRouter
-api_key_env: "OPENROUTER_API_KEY"
-base_url: "https://openrouter.ai/api/v1"
-temperature: 0.0
-```
-
----
-
-## ⚡ Running the Pipeline
-
-### Option A: Run the Entire Pipeline in One Click (`run_all.py`)
-Run all stages (Parse &rarr; Extract &rarr; Bible &rarr; Detect &rarr; Judge):
-
-```bash
-# Run on episodes 1 and 2
-python run_all.py --eps 1 2
-
-# Run on all 50 episodes
-python run_all.py
-
-# Re-run bible, detect, and judge using already extracted facts (skips LLM extraction)
-python run_all.py --skip-extract
-```
-
-**Terminal Summary Output:**
-```
-======================================================================
-🏁 PIPELINE EXECUTION SUMMARY
-======================================================================
-  ⏱️  Total Duration          : 0.04s
-  📄 Screenplay Lines Parsed : 169 across 2 ep(s) and 2 scene(s)
-  ✅ Facts Extracted         : 50
-  🗑️  Quotes Dropped (Halluc) : 9
-  👤 Canonical Entities      : 16
-  🔍 Contradiction Candidates: 1
-     - Value Conflicts       : 1
-     - State Errors          : 0
-  🚩 Flags Kept for Review   : 0 (real_error / unclear)
-  🛡️  Filtered Discrepancies  : 1 (legit_change / deception)
-----------------------------------------------------------------------
-📁 Output Artifacts:
-  - Parsed Episodes : continuity/data/episodes.json
-  - Facts Directory : continuity/outputs/facts_ep*.json
-  - Alias Merge Map : continuity/outputs/alias_map.json
-  - Series Bible    : continuity/outputs/bible.json
-  - Candidate Pairs : continuity/outputs/candidates.json
-  - Reviewed Flags  : continuity/outputs/flags.csv
-  - Judgments JSON  : continuity/outputs/judgments.json
-======================================================================
-```
-
----
-
-### Option B: Run Individual Pipeline Stages
-
-#### Stage 1: Parse Screenplays into Structured Events
-Splits screenplay files into episodes, scenes, and lines with timestamps, handling odd formats without crashing:
 ```bash
 python -m continuity.parse
 ```
-- **Output:** `continuity/data/episodes.json` formatted as `{ep, scene, timestamp, speaker, text}`.
 
-#### Stage 2: Fact Extraction & Verbatim Verification
-Extracts checkable facts per episode, strictly validating quotes against the text and dropping hallucinations:
+Handles block headers, inline `[mm:ss] SPEAKER:` lines, SRT arrow timing, scene
+metadata, and plain `SPEAKER:` lines. Writes `continuity/data/episodes.json` and
+`data/episodes.json`.
+
+### 2. Extract facts
+
 ```bash
-python -m continuity.extract --eps 1 2
+python -m continuity.extract --eps 1 2 3
 ```
-- **Output:** `continuity/outputs/facts_ep1.json`, `continuity/outputs/facts_ep2.json`, etc.
 
-#### Stage 3: Build Series Bible & Normalize Aliases
-Normalizes character names using alias lists and an LLM-proposed alias merge map:
+- One LLM call per episode using `prompts/extract.txt`.
+- Drops any fact whose quote is not a case/whitespace-insensitive verbatim
+  substring of that episode's screenplay text.
+- Rejects section labels (`Episode N`, `Timeline`, etc.) as entities.
+- Normalizes attributes to snake_case and cleans aliases.
+- A failed episode call does not abort the pipeline or overwrite a previous good
+  facts file.
+
+### 3. Build the Series Bible
+
 ```bash
 python -m continuity.bible
-
-# Or force re-generating the alias proposal:
+python -m continuity.bible --no-llm        # offline, rule-based aliases
 python -m continuity.bible --rebuild-aliases
 ```
-- **Output:**
-  - `continuity/outputs/alias_map.json`: Human-editable alias mapping (e.g. `"The Former Groom": "Gerald"`).
-  - `continuity/outputs/bible.json`: `entity -> attribute -> list of {value, ep, timestamp, quote, reliability}`.
 
-#### Stage 4: Detect Contradiction Candidates
-Runs two passes over the Series Bible:
-1. **Pass 1 (Value Conflicts)**: Same entity + attribute with conflicting values in different episodes (filtering `reliability == "stated"`).
-2. **Pass 2 (State Errors)**: Entities with disabling status (arrested, dead, injured) who reappear or speak later without an intervening reversal.
+- Loads all `outputs/facts_ep*.json` files.
+- Loads an existing `alias_map.json` and preserves human edits; new entities are
+  added incrementally.
+- Resolves canonical names case-insensitively and via aliases carried by facts.
+- Normalizes attribute keys and filters non-character entities.
+- Writes `entity -> attribute -> [{value, ep, timestamp, quote, reliability}]`.
+
+### 4. Detect candidates
+
 ```bash
 python -m continuity.detect
 ```
-- **Output:** `continuity/outputs/candidates.json`.
 
-#### Stage 5: Judge Contradictions & Rank by Severity
-Evaluates candidate pairs via `call_llm()`, flags `real_error` and `unclear`, marks `legit_change` and `deception` as filtered, and sorts by severity:
+- **Pass 1 (value conflicts):** same canonical entity + normalized attribute with
+  different stated values in different episodes.
+- **Pass 2 (state errors):** a stated dead/arrested/injured state followed by a
+  later stated fact, with no reversal (released, freed, healed, survived, ...) in
+  between. Only stated facts can establish or clear a state.
+
+### 5. Judge flags
+
 ```bash
 python -m continuity.judge
 ```
-- **Output:**
-  - `continuity/outputs/flags.csv`: CSV table sorted by severity (`CRITICAL` &rarr; `HIGH` &rarr; `MEDIUM` &rarr; `LOW`).
-  - `continuity/outputs/judgments.json`: Full structured JSON.
+
+Verdicts: `real_error`, `legit_change`, `deception`, `unclear`.
+
+- `real_error` and `unclear` → **FLAG** (human review).
+- `legit_change` and `deception` → **FILTERED** (still exported).
+- LLM failures degrade to `unclear` and record `llm_error`.
+- An empty candidate set clears stale `flags.csv` / `judgments.json`.
 
 ---
 
-## 🖥️ Launch the Streamlit Review Studio
+## One-click pipeline
 
-Open the interactive human review studio:
+```bash
+python run_all.py                    # all episodes found in continuity/data or data/
+python run_all.py --eps 1 2 3
+python run_all.py --skip-parse
+python run_all.py --skip-extract
+python run_all.py --rebuild-aliases
+```
+
+`python -m continuity.run_all` is equivalent.
+
+---
+
+## Streamlit studio
+
 ```bash
 streamlit run continuity/app.py
 ```
 
-### Studio Features:
-1. **Side-by-Side Review Queue**:
-   - Inspect **Episode A vs Episode B** with verbatim quote boxes, timestamps, and reasoning.
-   - **`✅ Accept Flag`** (confirmed bug) vs **`❌ Reject Flag`** (benign change) buttons per flag.
-   - Saves reviews persistently to `continuity/outputs/reviews.json`.
-2. **Live Precision Gauge**:
-   $$\text{Precision} = \frac{\text{Accepted}}{\text{Accepted} + \text{Rejected}} \times 100\%$$
-   Updates live as you audit flags.
-3. **Plotly Visual Analytics**:
-   - Cross-episode discrepancy arc timeline.
-   - Severity distribution donut chart.
-   - Entity discrepancy risk leaderboard.
-4. **Series Bible Explorer**:
-   - Search and inspect any character's complete chronological lore and dialogue history.
-5. **1-Click Downloads**:
-   - Download reviewed flags as CSV, judgments JSON, or review audit trails.
+Tabs:
+
+1. **Upload & Run Pipeline** — save uploaded episodes as
+   `continuity/data/episode_NNN.txt`, then run parse/extract/bible/detect/judge.
+2. **Human Review Queue** — filters, side-by-side quotes, Accept / Reject / Reset.
+3. **Visual Analytics** — severity donut, entity risk leaderboard, precision gauge,
+   verdict breakdown, contradiction arc map.
+4. **Series Bible Explorer** — search entities and inspect attribute timelines.
+5. **Export Reports** — reviewed CSV, judgments JSON, review audit JSON.
+
+Human decisions are stored in `outputs/reviews.json`.
+Live precision = `accepted / (accepted + rejected)` over the currently loaded
+flags. Demo rows appear only when no real judged flags exist and are never mixed
+with real results.
+
+---
+
+## Configuration
+
+`config.yaml`:
+
+```yaml
+provider: "openai"            # "openai" (OpenAI-compatible) or "gemini"
+model: "nvidia/nemotron-3-ultra-550b-a55b:free"
+api_key_env: "OPENROUTER_API_KEY"
+base_url: "https://openrouter.ai/api/v1"
+temperature: 0.0
+timeout_seconds: 60
+```
+
+API keys are read from the repository-root `.env`.
+
+### Cache
+
+`data/cache.json` keys include provider, model, base URL, temperature, and prompt.
+Legacy prompt-only keys are migrated automatically. Malformed JSON responses are
+never cached.
+
+---
+
+## Outputs
+
+| File | Meaning |
+| --- | --- |
+| `data/episodes.json` | parsed line records |
+| `outputs/facts_epN.json` | verified facts per episode |
+| `outputs/alias_map.json` | human-editable variant → canonical mapping |
+| `outputs/bible.json` | Series Bible |
+| `outputs/candidates.json` | candidate contradiction pairs |
+| `outputs/flags.csv` | flagged/filtered review table |
+| `outputs/judgments.json` | full verdicts and reasons |
+| `outputs/reviews.json` | human decisions |
+
+---
+
+## Tests
+
+```bash
+python -m continuity.test_detect
+python -m continuity.test_llm
+python test_step2.py
+python test_step3.py
+python test_step4.py
+python test_step5.py
+```
+
+`test_detect` is fully offline. `test_llm` may make one live API call.

@@ -21,6 +21,14 @@ from src.checker import check_contradictions
 from src.reporter import generate_markdown_report, generate_json_report, print_cli_summary
 from src.models import Fact
 
+# Windows legacy consoles default to cp1252, which cannot encode the emoji used
+# in the CLI summary. Reconfigure defensively before any output is written.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",

@@ -1,6 +1,26 @@
 [
   {
     "type": "value_conflict",
+    "entity": "Blond Nobleman",
+    "attribute": "father",
+    "fact_a": {
+      "value": "Juliana's elderly father",
+      "ep": 1,
+      "timestamp": "01:19.00",
+      "quote": "Juliana turns abruptly toward the first row of pews, where her elderly father sits gripping an ornate brass cane.",
+      "reliability": "stated"
+    },
+    "fact_b": {
+      "value": "Juliana",
+      "ep": 2,
+      "timestamp": "00:30.90",
+      "quote": "Father...",
+      "reliability": "stated"
+    },
+    "description": "Value conflict for Blond Nobleman -> father: Ep 1 ('Juliana's elderly father') vs Ep 2 ('Juliana')"
+  },
+  {
+    "type": "value_conflict",
     "entity": "Cathedral",
     "attribute": "location",
     "fact_a": {
@@ -18,5 +38,85 @@
       "reliability": "stated"
     },
     "description": "Value conflict for Cathedral -> location: Ep 1 ('wedding venue with nave, altar, aisle, wooden pews') vs Ep 2 ('INT. CATHEDRAL – CONTINUOUS')"
+  },
+  {
+    "type": "value_conflict",
+    "entity": "Cathedral",
+    "attribute": "location",
+    "fact_a": {
+      "value": "wedding venue with nave, altar, aisle, wooden pews",
+      "ep": 1,
+      "timestamp": "00:00.00",
+      "quote": "INT. CATHEDRAL – DAY",
+      "reliability": "stated"
+    },
+    "fact_b": {
+      "value": "Cathedral Nave, continuous into aisle",
+      "ep": 3,
+      "timestamp": "00:00.00",
+      "quote": "INT. CATHEDRAL NAVE – DAY",
+      "reliability": "stated"
+    },
+    "description": "Value conflict for Cathedral -> location: Ep 1 ('wedding venue with nave, altar, aisle, wooden pews') vs Ep 3 ('Cathedral Nave, continuous into aisle')"
+  },
+  {
+    "type": "value_conflict",
+    "entity": "Cathedral",
+    "attribute": "location",
+    "fact_a": {
+      "value": "INT. CATHEDRAL – CONTINUOUS",
+      "ep": 2,
+      "timestamp": "00:00.00",
+      "quote": "Scene heading: INT. CATHEDRAL – CONTINUOUS",
+      "reliability": "stated"
+    },
+    "fact_b": {
+      "value": "Cathedral Nave, continuous into aisle",
+      "ep": 3,
+      "timestamp": "00:00.00",
+      "quote": "INT. CATHEDRAL NAVE – DAY",
+      "reliability": "stated"
+    },
+    "description": "Value conflict for Cathedral -> location: Ep 2 ('INT. CATHEDRAL – CONTINUOUS') vs Ep 3 ('Cathedral Nave, continuous into aisle')"
+  },
+  {
+    "type": "value_conflict",
+    "entity": "Matriarch",
+    "attribute": "command",
+    "fact_a": {
+      "value": "tells Juliana to turn around",
+      "ep": 1,
+      "timestamp": "00:11.30",
+      "quote": "You should turn around, Juliana.",
+      "reliability": "stated"
+    },
+    "fact_b": {
+      "value": "orders Juliana to stop",
+      "ep": 3,
+      "timestamp": "00:23.10",
+      "quote": "Enough, Juliana.",
+      "reliability": "stated"
+    },
+    "description": "Value conflict for Matriarch -> command: Ep 1 ('tells Juliana to turn around') vs Ep 3 ('orders Juliana to stop')"
+  },
+  {
+    "type": "value_conflict",
+    "entity": "Matriarch",
+    "attribute": "command",
+    "fact_a": {
+      "value": "tells Juliana to turn around",
+      "ep": 1,
+      "timestamp": "00:11.30",
+      "quote": "You should turn around, Juliana.",
+      "reliability": "stated"
+    },
+    "fact_b": {
+      "value": "orders guards to remove Juliana",
+      "ep": 3,
+      "timestamp": "00:58.30",
+      "quote": "Guards! Remove her!",
+      "reliability": "stated"
+    },
+    "description": "Value conflict for Matriarch -> command: Ep 1 ('tells Juliana to turn around') vs Ep 3 ('orders guards to remove Juliana')"
   }
 ]

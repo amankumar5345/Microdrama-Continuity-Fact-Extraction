@@ -4,6 +4,13 @@ continuity/test_detect.py
 Verifies Pass 1 and Pass 2 contradiction detection.
 """
 
+import sys
+from pathlib import Path
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
 from continuity.detect import pass_1_value_conflicts, pass_2_state_errors
 
 def test_detect():

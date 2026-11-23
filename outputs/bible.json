@@ -1,5 +1,5 @@
 {
-  "ARISTOCRATIC CONGREGATION": {
+  "Aristocratic Congregation": {
     "audience": [
       {
         "value": "entire aristocratic congregation witnesses events",
@@ -10,18 +10,16 @@
       }
     ]
   },
-  "BOTH FAMILIES": {
-    "witness": [
+  "Blond Nobleman": {
+    "appearance": [
       {
-        "value": "present at wedding ceremony",
-        "ep": 2,
-        "timestamp": "00:18.20",
-        "quote": "You gave me your word before both our families.",
+        "value": "elderly, looks down, gripping hands nervously",
+        "ep": 3,
+        "timestamp": "01:38.40",
+        "quote": "Close-up of Juliana's elderly father looking down, gripping his hands nervously with profound guilt.",
         "reliability": "stated"
       }
-    ]
-  },
-  "Blond Nobleman": {
+    ],
     "description": [
       {
         "value": "seated prominently in the family pew, clutching his gold-topped cane",
@@ -38,9 +36,7 @@
         "timestamp": "01:19.00",
         "quote": "Juliana turns abruptly toward the first row of pews, where her elderly father sits gripping an ornate brass cane.",
         "reliability": "stated"
-      }
-    ],
-    "father_of": [
+      },
       {
         "value": "Juliana",
         "ep": 2,
@@ -75,6 +71,26 @@
         "quote": "Close-up on the father's weathered face, looking fixedly at the floor, refusing to meet her gaze.",
         "reliability": "stated"
       }
+    ],
+    "ring": [
+      {
+        "value": "wrings gold ring",
+        "ep": 3,
+        "timestamp": "01:54.20",
+        "quote": "Close-up on Juliana's father wringing his gold ring, eyes heavy with regret.",
+        "reliability": "stated"
+      }
+    ]
+  },
+  "Both Families": {
+    "witness": [
+      {
+        "value": "present at wedding ceremony",
+        "ep": 2,
+        "timestamp": "00:18.20",
+        "quote": "You gave me your word before both our families.",
+        "reliability": "stated"
+      }
     ]
   },
   "Cathedral": {
@@ -92,10 +108,42 @@
         "timestamp": "00:00.00",
         "quote": "Scene heading: INT. CATHEDRAL – CONTINUOUS",
         "reliability": "stated"
+      },
+      {
+        "value": "Cathedral Nave, continuous into aisle",
+        "ep": 3,
+        "timestamp": "00:00.00",
+        "quote": "INT. CATHEDRAL NAVE – DAY",
+        "reliability": "stated"
+      }
+    ],
+    "owner": [
+      {
+        "value": "claimed as mother's church by Juliana",
+        "ep": 3,
+        "timestamp": "00:46.40",
+        "quote": "This is my mother's church.",
+        "reliability": "stated"
+      },
+      {
+        "value": "claimed as family's chapel by Noble Matriarch",
+        "ep": 3,
+        "timestamp": "01:13.00",
+        "quote": "And who are you to give orders in my family's chapel?!",
+        "reliability": "stated"
       }
     ]
   },
   "Clarissa": {
+    "appearance": [
+      {
+        "value": "wearing gold gown",
+        "ep": 3,
+        "timestamp": "00:02.10",
+        "quote": "Look at you...",
+        "reliability": "stated"
+      }
+    ],
     "attire": [
       {
         "value": "gold gown and white gloves",
@@ -105,7 +153,16 @@
         "reliability": "stated"
       }
     ],
-    "duration of conspiracy": [
+    "defense": [
+      {
+        "value": "denies stealing wedding",
+        "ep": 3,
+        "timestamp": "00:13.80",
+        "quote": "I didn't steal what was never truly yours.",
+        "reliability": "stated"
+      }
+    ],
+    "duration_of_conspiracy": [
       {
         "value": "long enough to know Gerald was never going to marry Juliana",
         "ep": 1,
@@ -129,6 +186,15 @@
         "ep": 1,
         "timestamp": "01:10.60",
         "quote": "Of course I knew.",
+        "reliability": "stated"
+      }
+    ],
+    "locket": [
+      {
+        "value": "mocks Juliana's locket",
+        "ep": 3,
+        "timestamp": "00:03.60",
+        "quote": "...still clinging to that little locket as if it can make you worthy of a place here.",
         "reliability": "stated"
       }
     ],
@@ -159,12 +225,30 @@
         "reliability": "stated"
       }
     ],
-    "sister_of": [
+    "sister": [
       {
         "value": "Juliana",
         "ep": 2,
         "timestamp": "00:47.80",
         "quote": "Why are you surprised, sister? Look at you.",
+        "reliability": "stated"
+      }
+    ],
+    "wedding": [
+      {
+        "value": "claims wedding is now hers",
+        "ep": 3,
+        "timestamp": "00:20.60",
+        "quote": "Now it is mine.",
+        "reliability": "stated"
+      }
+    ],
+    "wedding_plan": [
+      {
+        "value": "implies wedding was meant to be hers",
+        "ep": 3,
+        "timestamp": "00:18.70",
+        "quote": "It was supposed to be.",
         "reliability": "stated"
       }
     ]
@@ -176,17 +260,6 @@
         "ep": 2,
         "timestamp": "00:00.00",
         "quote": "Medium low-angle shot on Gerald at the altar steps, looking down dismissively, while Clarissa in her shimmering gold gown stands behind him gloating.",
-        "reliability": "stated"
-      }
-    ]
-  },
-  "GOLD-TOPPED CANE": {
-    "description": [
-      {
-        "value": "gold-topped cane clutched by Juliana's father",
-        "ep": 2,
-        "timestamp": "00:30.60",
-        "quote": "Medium shot of Juliana's father seated prominently in the family pew, clutching his gold-topped cane.",
         "reliability": "stated"
       }
     ]
@@ -219,7 +292,16 @@
         "reliability": "stated"
       }
     ],
-    "former engagement": [
+    "demeanor": [
+      {
+        "value": "looks away impassively",
+        "ep": 3,
+        "timestamp": "00:18.60",
+        "quote": "Side medium shot of Gerald looking away impassively as the Lady in Gold Gown leans back against him.",
+        "reliability": "stated"
+      }
+    ],
+    "former_engagement": [
       {
         "value": "was engaged to Juliana",
         "ep": 1,
@@ -246,6 +328,24 @@
         "reliability": "stated"
       }
     ],
+    "presence": [
+      {
+        "value": "standing at front of nave with Lady in Gold Gown",
+        "ep": 3,
+        "timestamp": "00:11.10",
+        "quote": "Medium two-shot of Gerald and the Lady in Gold Gown standing together at the front of the nave.",
+        "reliability": "stated"
+      }
+    ],
+    "reaction": [
+      {
+        "value": "urges guards to attack The Bearded Stranger",
+        "ep": 3,
+        "timestamp": "01:25.60",
+        "quote": "What are you waiting for?! He's only one man!",
+        "reliability": "stated"
+      }
+    ],
     "response": [
       {
         "value": "Promises change when a better choice appears",
@@ -255,7 +355,7 @@
         "reliability": "stated"
       }
     ],
-    "value assessment": [
+    "value_assessment": [
       {
         "value": "Juliana has nothing to offer him anymore",
         "ep": 1,
@@ -265,7 +365,18 @@
       }
     ]
   },
-  "HEIRLOOM AMETHYST PENDANT": {
+  "Gold-Topped Cane": {
+    "description": [
+      {
+        "value": "gold-topped cane clutched by Juliana's father",
+        "ep": 2,
+        "timestamp": "00:30.60",
+        "quote": "Medium shot of Juliana's father seated prominently in the family pew, clutching his gold-topped cane.",
+        "reliability": "stated"
+      }
+    ]
+  },
+  "Heirloom Amethyst Pendant": {
     "description": [
       {
         "value": "heirloom amethyst pendant resting against Juliana's gown",
@@ -288,6 +399,22 @@
     ]
   },
   "Lady Juliana": {
+    "accusation": [
+      {
+        "value": "accuses Lady in Gold Gown of stealing her wedding",
+        "ep": 3,
+        "timestamp": "00:08.80",
+        "quote": "You stole my wedding.",
+        "reliability": "stated"
+      },
+      {
+        "value": "claims Lady in Gold Gown hasn't earned anything",
+        "ep": 3,
+        "timestamp": "00:11.20",
+        "quote": "Don't pretend you've earned anything.",
+        "reliability": "stated"
+      }
+    ],
     "action": [
       {
         "value": "clutches mother's silk bridal gown",
@@ -297,12 +424,30 @@
         "reliability": "stated"
       }
     ],
+    "appearance": [
+      {
+        "value": "wearing white gown, clutching mother's medallion",
+        "ep": 3,
+        "timestamp": "00:00.00",
+        "quote": "Medium shot on Lady Juliana standing abandoned near the altar in her white gown, clutching her mother's medallion to her chest.",
+        "reliability": "stated"
+      }
+    ],
     "attire": [
       {
         "value": "mother's vintage gown and oval pendant necklace",
         "ep": 1,
         "timestamp": "00:01.00",
         "quote": "Juliana pauses at the threshold, her expression bright with joyful anticipation, wearing her mother's vintage gown and an oval pendant necklace.",
+        "reliability": "stated"
+      }
+    ],
+    "banishment": [
+      {
+        "value": "questions where she must go",
+        "ep": 3,
+        "timestamp": "00:42.10",
+        "quote": "Leave where?",
         "reliability": "stated"
       }
     ],
@@ -333,12 +478,66 @@
         "reliability": "stated"
       }
     ],
-    "former engagement": [
+    "familiarity": [
+      {
+        "value": "states The Bearded Stranger doesn't know her",
+        "ep": 3,
+        "timestamp": "02:07.70",
+        "quote": "You don't even know me.",
+        "reliability": "stated"
+      }
+    ],
+    "fathers_action": [
+      {
+        "value": "claims her father said nothing",
+        "ep": 3,
+        "timestamp": "00:33.30",
+        "quote": "And my father said nothing.",
+        "reliability": "stated"
+      }
+    ],
+    "former_engagement": [
       {
         "value": "Gerald was her fiancé",
         "ep": 1,
         "timestamp": "01:03.40",
         "quote": "You swore you loved me!",
+        "reliability": "stated"
+      }
+    ],
+    "future": [
+      {
+        "value": "asks about her fate",
+        "ep": 3,
+        "timestamp": "00:38.50",
+        "quote": "And what happens to me?",
+        "reliability": "stated"
+      }
+    ],
+    "grievance": [
+      {
+        "value": "claims she was humiliated by Noble Matriarch's family",
+        "ep": 3,
+        "timestamp": "00:30.40",
+        "quote": "I was humiliated by your family.",
+        "reliability": "stated"
+      }
+    ],
+    "injury": [
+      {
+        "value": "indicates she is not hurt",
+        "ep": 3,
+        "timestamp": "01:31.80",
+        "quote": "Juliana softly shakes her head 'no', her wide blue eyes locked onto him.",
+        "reliability": "stated"
+      }
+    ],
+    "interaction": [
+      {
+        "value": "grabs wooden pew rim",
+        "ep": 3,
+        "timestamp": "01:02.00",
+        "quote": "Close-up of Juliana's hand frantically grabbing the wooden rim of a pew, knuckles white with strain.",
         "reliability": "stated"
       }
     ],
@@ -348,6 +547,24 @@
         "ep": 2,
         "timestamp": "00:00.00",
         "quote": "I cannot marry you, Juliana.",
+        "reliability": "stated"
+      }
+    ],
+    "owner": [
+      {
+        "value": "claims the church belongs to her mother",
+        "ep": 3,
+        "timestamp": "00:46.40",
+        "quote": "This is my mother's church.",
+        "reliability": "stated"
+      }
+    ],
+    "plea": [
+      {
+        "value": "begs for help",
+        "ep": 3,
+        "timestamp": "01:02.40",
+        "quote": "Please! Someone!",
         "reliability": "stated"
       }
     ],
@@ -368,31 +585,72 @@
         "quote": "You have shown them exactly what your word is worth.",
         "reliability": "stated"
       }
-    ]
-  },
-  "MOTHER'S APOTHECARY HERBS": {
-    "reference": [
+    ],
+    "question": [
       {
-        "value": "mother's apothecary herbs",
-        "ep": 2,
+        "value": "asks The Bearded Stranger his motive",
+        "ep": 3,
+        "timestamp": "01:50.90",
+        "quote": "Why are you doing this?",
+        "reliability": "stated"
+      }
+    ],
+    "reaction": [
+      {
+        "value": "overcome with emotion, hopeful",
+        "ep": 3,
+        "timestamp": "02:20.50",
+        "quote": "Juliana gazes down at her rugged savior, overcome with emotion as the swelling score holds on the cliffhanger.",
+        "reliability": "stated"
+      }
+    ],
+    "resistance": [
+      {
+        "value": "resists guards",
+        "ep": 3,
         "timestamp": "01:00.60",
-        "quote": "...not a dull creature who hides in her mother's apothecary herbs.",
+        "quote": "Let me go!",
         "reliability": "stated"
       }
-    ]
-  },
-  "PRIEST": {
-    "presence": [
+    ],
+    "right": [
       {
-        "value": "present at altar with Gerald and Clarissa",
-        "ep": 2,
-        "timestamp": "00:23.80",
-        "quote": "Medium two-shot of Gerald and Clarissa standing side by side before the priest.",
+        "value": "asserts right to remain in church",
+        "ep": 3,
+        "timestamp": "00:48.90",
+        "quote": "I have every right to stand here.",
+        "reliability": "stated"
+      }
+    ],
+    "wedding_status": [
+      {
+        "value": "claims the wedding was hers",
+        "ep": 3,
+        "timestamp": "00:16.60",
+        "quote": "This was my wedding.",
         "reliability": "stated"
       }
     ]
   },
-  "The Matriarch": {
+  "Matriarch": {
+    "accusation": [
+      {
+        "value": "accuses Juliana of humiliating family",
+        "ep": 3,
+        "timestamp": "00:25.90",
+        "quote": "You have humiliated this family enough for one day.",
+        "reliability": "stated"
+      }
+    ],
+    "appearance": [
+      {
+        "value": "wearing lavish black velvet gown and jeweled tiara",
+        "ep": 3,
+        "timestamp": "00:22.80",
+        "quote": "Low-angle wide shot of an imperious Noble Matriarch in a lavish black velvet gown and jeweled tiara stepping forward.",
+        "reliability": "stated"
+      }
+    ],
     "attire": [
       {
         "value": "black velvet, ornate tiara, sapphire jewelry",
@@ -402,7 +660,25 @@
         "reliability": "stated"
       }
     ],
-    "clarissa's title": [
+    "banishment": [
+      {
+        "value": "orders Juliana to leave",
+        "ep": 3,
+        "timestamp": "00:40.50",
+        "quote": "You leave.",
+        "reliability": "stated"
+      }
+    ],
+    "banishment_destination": [
+      {
+        "value": "indicates Juliana is a discarded daughter",
+        "ep": 3,
+        "timestamp": "00:43.40",
+        "quote": "Wherever a discarded daughter belongs.",
+        "reliability": "stated"
+      }
+    ],
+    "clarissas_title": [
       {
         "value": "jewel of this family",
         "ep": 1,
@@ -418,6 +694,20 @@
         "timestamp": "00:11.30",
         "quote": "You should turn around, Juliana.",
         "reliability": "stated"
+      },
+      {
+        "value": "orders Juliana to stop",
+        "ep": 3,
+        "timestamp": "00:23.10",
+        "quote": "Enough, Juliana.",
+        "reliability": "stated"
+      },
+      {
+        "value": "orders guards to remove Juliana",
+        "ep": 3,
+        "timestamp": "00:58.30",
+        "quote": "Guards! Remove her!",
+        "reliability": "stated"
       }
     ],
     "description": [
@@ -429,12 +719,30 @@
         "reliability": "stated"
       }
     ],
-    "gerald's intention": [
+    "fathers_decision": [
+      {
+        "value": "states father has chosen",
+        "ep": 3,
+        "timestamp": "00:36.50",
+        "quote": "Your father has made his choice.",
+        "reliability": "stated"
+      }
+    ],
+    "geralds_intention": [
       {
         "value": "not waiting for Juliana anymore",
         "ep": 1,
         "timestamp": "00:18.00",
         "quote": "Not anymore.",
+        "reliability": "stated"
+      }
+    ],
+    "interference": [
+      {
+        "value": "claims The Bearded Stranger cannot interfere",
+        "ep": 3,
+        "timestamp": "01:36.50",
+        "quote": "You cannot interfere in a family matter!",
         "reliability": "stated"
       }
     ],
@@ -447,6 +755,15 @@
         "reliability": "stated"
       }
     ],
+    "owner": [
+      {
+        "value": "claims chapel belongs to her family",
+        "ep": 3,
+        "timestamp": "01:13.00",
+        "quote": "And who are you to give orders in my family's chapel?!",
+        "reliability": "stated"
+      }
+    ],
     "remark": [
       {
         "value": "tells Juliana she should be grateful to be allowed to attend the wedding",
@@ -455,15 +772,194 @@
         "quote": "You should be grateful you're at least allowed to attend the wedding.",
         "reliability": "stated"
       }
+    ],
+    "rights": [
+      {
+        "value": "denies Juliana's right to stand in church",
+        "ep": 3,
+        "timestamp": "00:51.30",
+        "quote": "Not anymore.",
+        "reliability": "stated"
+      }
     ]
   },
-  "Timeline": {
-    "event": [
+  "Mother's Apothecary Herbs": {
+    "reference": [
       {
-        "value": "wedding day ceremony",
-        "ep": 1,
+        "value": "mother's apothecary herbs",
+        "ep": 2,
+        "timestamp": "01:00.60",
+        "quote": "...not a dull creature who hides in her mother's apothecary herbs.",
+        "reliability": "stated"
+      }
+    ]
+  },
+  "Mother's Medallion": {
+    "description": [
+      {
+        "value": "jeweled silver locket, oval shape, belonged to mother",
+        "ep": 3,
         "timestamp": "00:00.00",
-        "quote": "INT. CATHEDRAL – DAY",
+        "quote": "Medium shot on Lady Juliana standing abandoned near the altar in her white gown, clutching her mother's medallion to her chest.",
+        "reliability": "stated"
+      }
+    ]
+  },
+  "Priest": {
+    "presence": [
+      {
+        "value": "present at altar with Gerald and Clarissa",
+        "ep": 2,
+        "timestamp": "00:23.80",
+        "quote": "Medium two-shot of Gerald and Clarissa standing side by side before the priest.",
+        "reliability": "stated"
+      }
+    ]
+  },
+  "Royal Guards": {
+    "appearance": [
+      {
+        "value": "wearing red uniforms and bearskin caps",
+        "ep": 3,
+        "timestamp": "01:00.00",
+        "quote": "Medium shot as two royal guards in red uniforms and bearskin caps step in behind Juliana and seize her arms.",
+        "reliability": "stated"
+      }
+    ],
+    "command": [
+      {
+        "value": "orders The Bearded Stranger to stand aside",
+        "ep": 3,
+        "timestamp": "01:17.20",
+        "quote": "Stand aside, stranger!",
+        "reliability": "stated"
+      }
+    ]
+  },
+  "Silver Ring": {
+    "description": [
+      {
+        "value": "simple polished silver band",
+        "ep": 3,
+        "timestamp": "01:59.20",
+        "quote": "Extreme close-up of The Bearded Stranger's rugged fingers holding up a simple, polished silver band.",
+        "reliability": "stated"
+      }
+    ]
+  },
+  "The Bearded Stranger": {
+    "action": [
+      {
+        "value": "kneels to propose",
+        "ep": 3,
+        "timestamp": "02:13.20",
+        "quote": "The Bearded Stranger sinks to one knee on the cathedral aisle, offering the silver ring up to Juliana.",
+        "reliability": "stated"
+      }
+    ],
+    "appearance": [
+      {
+        "value": "tall, rugged, worn dark trench coat",
+        "ep": 3,
+        "timestamp": "01:06.00",
+        "quote": "A tall, rugged man in a worn dark trench coat—The Bearded Stranger—emerges into the center of the nave.",
+        "reliability": "stated"
+      }
+    ],
+    "combat": [
+      {
+        "value": "defeats guard effortlessly",
+        "ep": 3,
+        "timestamp": "01:24.00",
+        "quote": "The Bearded Stranger effortlessly blocks the guard's strike and drives a devastating strike into him, dropping the armed guard instantly to the floor.",
+        "reliability": "stated"
+      }
+    ],
+    "command": [
+      {
+        "value": "orders guards to release Juliana",
+        "ep": 3,
+        "timestamp": "01:09.90",
+        "quote": "Take your hands off her.",
+        "reliability": "stated"
+      }
+    ],
+    "concern": [
+      {
+        "value": "asks Juliana if she is hurt",
+        "ep": 3,
+        "timestamp": "01:30.40",
+        "quote": "Are you hurt?",
+        "reliability": "stated"
+      }
+    ],
+    "knowledge": [
+      {
+        "value": "claims he knows enough about Juliana",
+        "ep": 3,
+        "timestamp": "02:10.40",
+        "quote": "I know enough.",
+        "reliability": "stated"
+      }
+    ],
+    "loss": [
+      {
+        "value": "says they took her chance to become a wife",
+        "ep": 3,
+        "timestamp": "02:02.50",
+        "quote": "They took that from you.",
+        "reliability": "stated"
+      }
+    ],
+    "motive": [
+      {
+        "value": "states he helps because he wants to",
+        "ep": 3,
+        "timestamp": "01:52.80",
+        "quote": "Because I want to.",
+        "reliability": "stated"
+      }
+    ],
+    "proposal": [
+      {
+        "value": "offers marriage",
+        "ep": 3,
+        "timestamp": "02:05.30",
+        "quote": "I am offering it back.",
+        "reliability": "stated"
+      },
+      {
+        "value": "proposes marriage to Lady Juliana",
+        "ep": 3,
+        "timestamp": "02:17.50",
+        "quote": "Lady Juliana... accept my hand.",
+        "reliability": "stated"
+      }
+    ],
+    "purpose": [
+      {
+        "value": "states Juliana came to become a wife",
+        "ep": 3,
+        "timestamp": "01:59.80",
+        "quote": "You came here to become a wife.",
+        "reliability": "stated"
+      }
+    ],
+    "ring": [
+      {
+        "value": "presents a simple polished silver ring",
+        "ep": 3,
+        "timestamp": "01:59.20",
+        "quote": "Extreme close-up of The Bearded Stranger's rugged fingers holding up a simple, polished silver band.",
+        "reliability": "stated"
+      }
+    ],
+    "warning": [
+      {
+        "value": "warns other guard not to touch Juliana",
+        "ep": 3,
+        "timestamp": "01:34.10",
+        "quote": "Good. Then don't touch her again.",
         "reliability": "stated"
       }
     ]
@@ -475,6 +971,17 @@
         "ep": 1,
         "timestamp": "00:29.80",
         "quote": "Panning shot across the seated wedding guests whispering and casting judging glances from the wooden pews.",
+        "reliability": "stated"
+      }
+    ]
+  },
+  "Wooden Pew": {
+    "interaction": [
+      {
+        "value": "Juliana grabs rim",
+        "ep": 3,
+        "timestamp": "01:02.00",
+        "quote": "Close-up of Juliana's hand frantically grabbing the wooden rim of a pew, knuckles white with strain.",
         "reliability": "stated"
       }
     ]

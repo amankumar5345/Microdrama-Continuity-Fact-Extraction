@@ -20,7 +20,15 @@ from pathlib import Path
 from typing import List, Dict, Any, Tuple, Optional
 
 from continuity.llm import call_llm
+from continuity.textutil import (
+    clean_aliases,
+    enable_utf8_console,
+    is_noise_entity,
+    normalize_attribute,
+    normalize_text_for_matching,
+)
 
+enable_utf8_console()
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -37,14 +45,6 @@ ROOT_OUTPUTS_DIR = BASE_DIR.parent / "outputs"
 
 VALID_CATEGORIES = {"identity", "relationship", "status", "object", "place", "timeline"}
 VALID_RELIABILITIES = {"stated", "lie", "flashback", "hypothetical", "joke"}
-
-
-def normalize_text_for_matching(text: str) -> str:
-    """Normalize whitespace, quotes, and punctuation for robust verbatim substring matching."""
-    s = text.strip()
-    s = s.replace('"', '"').replace('"', '"').replace("'", "'").replace("'", "'")
-    s = re.sub(r"\s+", " ", s)
-    return s.lower()
 
 
 def is_quote_in_screenplay(quote: str, raw_screenplay: str) -> bool:
@@ -102,28 +102,32 @@ def validate_and_filter_facts(raw_facts: List[Dict[str, Any]], raw_screenplay: s
             continue
 
         entity = str(item.get("entity", "")).strip()
-        aliases = item.get("aliases", [])
         category = str(item.get("category", "")).strip().lower()
-        attribute = str(item.get("attribute", "")).strip().lower()
+        attribute = normalize_attribute(item.get("attribute", ""))
         value = str(item.get("value", "")).strip()
         reliability = str(item.get("reliability", "stated")).strip().lower()
         timestamp = str(item.get("timestamp", "")).strip()
         quote = str(item.get("quote", "")).strip()
 
-        # Schema validation
+        # Schema validation. Section labels such as "Episode 3" or "Timeline"
+        # are extraction noise, not story entities.
         if not entity or not attribute or not value or not quote:
             dropped_count += 1
             logger.warning(f"[Ep {ep_num}] Dropping malformed fact missing core fields: {item}")
             continue
+
+        if is_noise_entity(entity):
+            dropped_count += 1
+            logger.info(f"[Ep {ep_num}] Dropping non-character entity: {entity!r}")
+            continue
+
+        aliases = clean_aliases(entity, item.get("aliases", []))
 
         if category not in VALID_CATEGORIES:
             category = "status"
 
         if reliability not in VALID_RELIABILITIES:
             reliability = "stated"
-
-        if not isinstance(aliases, list):
-            aliases = [str(aliases)] if aliases else []
 
         # Verbatim quote check in source screenplay
         if not is_quote_in_screenplay(quote, raw_screenplay):
@@ -154,9 +158,20 @@ def extract_episode(ep_num: int, screenplay_path: Path) -> Dict[str, Any]:
         raw_screenplay = f.read()
 
     prompt = load_extract_prompt(ep_num, raw_screenplay)
-    
-    # Call LLM with JSON mode
-    response_data = call_llm(prompt, json_mode=True)
+
+    # Call LLM with JSON mode. A failure for one episode must not abort the
+    # whole pipeline or overwrite a previously good facts file.
+    try:
+        response_data = call_llm(prompt, json_mode=True)
+    except Exception as exc:
+        logger.error(f"[Ep {ep_num}] LLM extraction failed: {exc}")
+        return {
+            "episode": ep_num,
+            "facts_count": 0,
+            "dropped_count": 0,
+            "facts": [],
+            "error": str(exc),
+        }
 
     if not isinstance(response_data, dict):
         logger.error(f"[Ep {ep_num}] LLM did not return a JSON object. Got {type(response_data)}")

@@ -14,6 +14,13 @@ import logging
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple, Set
 
+try:
+    from continuity.textutil import enable_utf8_console
+except ModuleNotFoundError:  # allow `python continuity/parse.py`
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from continuity.textutil import enable_utf8_console
+
+enable_utf8_console()
 logger = logging.getLogger(__name__)
 
 # Base directories

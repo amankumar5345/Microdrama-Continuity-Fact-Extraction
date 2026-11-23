@@ -10,6 +10,7 @@ Judges candidate contradiction pairs via call_llm() using prompts/judge.txt.
 
 import sys
 import os
+import re
 import csv
 import json
 import logging
@@ -17,7 +18,9 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional
 
 from continuity.llm import call_llm
+from continuity.textutil import enable_utf8_console
 
+enable_utf8_console()
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -97,10 +100,13 @@ def format_judge_prompt(candidate: Dict[str, Any]) -> str:
 
     has_placeholders = any(k in template for k in replacements.keys())
     if has_placeholders:
-        prompt = template
-        for k, v in replacements.items():
-            prompt = prompt.replace(k, v)
-        return prompt
+        # Single-pass substitution: a quote that happens to contain "{ep_b}"
+        # must not be treated as another placeholder.
+        return re.sub(
+            r"\{[a-z_]+\}",
+            lambda match: replacements.get(match.group(0), match.group(0)),
+            template,
+        )
 
     # Fallback if user pasted a custom prompt without matching placeholders
     candidate_summary = (
@@ -115,11 +121,13 @@ def judge_candidate(candidate: Dict[str, Any]) -> Dict[str, Any]:
     """Judges a single candidate pair via call_llm()."""
     prompt = format_judge_prompt(candidate)
     
+    llm_error: Optional[str] = None
     try:
         resp = call_llm(prompt, json_mode=True)
     except Exception as e:
         logger.warning(f"Error calling LLM for candidate {candidate.get('entity')}: {e}")
         resp = {}
+        llm_error = str(e)
 
     if not isinstance(resp, dict):
         resp = {}
@@ -132,7 +140,13 @@ def judge_candidate(candidate: Dict[str, Any]) -> Dict[str, Any]:
     if raw_severity not in SEVERITY_ORDER:
         raw_severity = "MEDIUM"
 
-    reason = str(resp.get("reason", "No reason provided.")).strip()
+    reason = str(resp.get("reason", "")).strip()
+    if not reason:
+        reason = (
+            f"LLM judgment unavailable: {llm_error}"
+            if llm_error
+            else "No reason provided."
+        )
 
     # Keep real_error and unclear as FLAG; mark legit_change and deception as FILTERED
     status = "FLAG" if raw_verdict in ("real_error", "unclear") else "FILTERED"
@@ -157,6 +171,7 @@ def judge_candidate(candidate: Dict[str, Any]) -> Dict[str, Any]:
         "value_b": fact_b.get("value", ""),
         "quote_b": fact_b.get("quote", ""),
         "reason": reason,
+        "llm_error": llm_error or "",
     }
 
     return record
@@ -232,7 +247,11 @@ def main():
     logger.info("Running Continuity Judge...")
     candidates = load_candidates()
     if not candidates:
-        logger.warning("No candidates found in outputs/candidates.json. Run detect.py first!")
+        logger.warning("No candidates found in outputs/candidates.json.")
+        # Clear any stale judged artifacts so the dashboard matches detection.
+        export_flags_csv([], FLAGS_CSV_1)
+        export_judgments_json([], JUDGMENTS_JSON_1)
+        print("\n⚖️  No candidates to judge. Exported empty flags/judgments files.\n")
         sys.exit(0)
 
     judged_records = []
