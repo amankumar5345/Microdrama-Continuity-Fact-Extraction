@@ -101,6 +101,11 @@ def parse_arguments():
         action="store_true",
         help="Force LLM to re-propose alias mappings",
     )
+    parser.add_argument(
+        "--force-extract",
+        action="store_true",
+        help="Re-extract facts even when outputs/facts_epN.json already exists",
+    )
     return parser.parse_args()
 
 
@@ -109,6 +114,7 @@ def run_pipeline(
     skip_parse: bool = False,
     skip_extract: bool = False,
     rebuild_aliases: bool = False,
+    force_extract: bool = False,
 ):
     start_time = time.time()
     print("\n" + "=" * 70)
@@ -131,15 +137,8 @@ def run_pipeline(
                 target_files = list(fallback.glob("*.txt"))
 
         if target_files:
-            if eps:
-                import re
-                filtered = []
-                for f in target_files:
-                    m = re.search(r"(\d+)", f.name)
-                    if m and int(m.group(1)) in eps:
-                        filtered.append(f)
-                target_files = filtered or target_files
-
+            # Always parse every episode: parsing is fast, and --eps should only
+            # limit extraction/judgment, not truncate the global episodes.json.
             records = parse_files(target_files)
             lines_parsed_count = len(records)
             eps_seen = {r["ep"] for r in records}
@@ -157,6 +156,8 @@ def run_pipeline(
     print("\n[STAGE 2/5] Fact Extraction & Verbatim Quote Verification...")
     total_facts_extracted = 0
     total_quotes_dropped = 0
+    cached_episodes = 0
+    extracted_episodes = 0
 
     if not skip_extract:
         target_episodes = sorted(set(eps)) if eps else discover_episode_numbers()
@@ -168,14 +169,19 @@ def run_pipeline(
                 logger.warning(f"Screenplay file for Episode {ep_num} not found. Skipping.")
                 continue
 
-            res = extract_episode(ep_num, screenplay_path)
+            res = extract_episode(ep_num, screenplay_path, force=force_extract)
             if res.get("error"):
                 logger.error("Episode %d extraction failed: %s", ep_num, res["error"])
+            if res.get("cached"):
+                cached_episodes += 1
+            elif not res.get("error"):
+                extracted_episodes += 1
             total_facts_extracted += res.get("facts_count", 0)
             total_quotes_dropped += res.get("dropped_count", 0)
     else:
         logger.info("Skipping Stage 2 (Fact Extraction) as requested. Reading existing facts files...")
         all_fact_files = load_all_fact_files()
+        cached_episodes = len(all_fact_files)
         for fd in all_fact_files:
             total_facts_extracted += len(fd.get("facts", []))
             total_quotes_dropped += fd.get("dropped_count", 0)
@@ -243,6 +249,8 @@ def run_pipeline(
     if lines_parsed_count > 0:
         print(f"  📄 Screenplay Lines Parsed : {lines_parsed_count} across {episodes_parsed_count} ep(s) and {scenes_parsed_count} scene(s)")
     print(f"  ✅ Facts Extracted         : {total_facts_extracted}")
+    print(f"  ♻️  Episodes Reused/Cached  : {cached_episodes}")
+    print(f"  🧠 Episodes Freshly Extracted: {extracted_episodes}")
     print(f"  🗑️  Quotes Dropped (Halluc) : {total_quotes_dropped}")
     print(f"  👤 Canonical Entities      : {canonical_entities_count}")
     print(f"  🔍 Contradiction Candidates: {total_candidates}")
@@ -269,6 +277,7 @@ def main() -> None:
         skip_parse=args.skip_parse,
         skip_extract=args.skip_extract,
         rebuild_aliases=args.rebuild_aliases,
+        force_extract=args.force_extract,
     )
 
 

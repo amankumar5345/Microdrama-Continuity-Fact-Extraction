@@ -18,9 +18,14 @@ def enable_utf8_console() -> None:
     """Make emoji/Unicode CLI output safe on Windows legacy consoles."""
     for stream in (sys.stdout, sys.stderr):
         try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
+            stream.reconfigure(
+                encoding="utf-8", errors="replace", line_buffering=True
+            )
         except Exception:
-            pass
+            try:
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
 
 # Conservative synonyms only. Free-form LLM attributes are useful, but a small
 # map stops the most common naming drift from hiding real conflicts.

@@ -28,7 +28,9 @@ pip install -r requirements.txt
 #    OPENROUTER_API_KEY=...
 #    # or GEMINI_API_KEY=... / OPENAI_API_KEY=... / GROQ_API_KEY=...
 
-# 3. Run the full current pipeline (parse -> extract -> bible -> detect -> judge)
+# 3. Run the current pipeline. Start with a few episodes for a fast first run;
+#    drop --eps to process every episode that has no cached facts yet.
+python run_all.py --eps 1 2 3
 python run_all.py
 
 # 4. Launch the review studio
@@ -142,12 +144,16 @@ mixed into real results.
 ### Full pipeline
 
 ```bash
-python run_all.py                       # every episode found in continuity/data (or data/)
+python run_all.py                       # every episode not yet extracted in continuity/data (or data/)
 python run_all.py --eps 1 2 3           # only these episodes
 python run_all.py --skip-parse          # reuse data/episodes.json
-python run_all.py --skip-extract        # reuse facts_ep*.json
+python run_all.py --skip-extract        # reuse facts_ep*.json for all stages
 python run_all.py --rebuild-aliases     # force a fresh LLM alias proposal
+python run_all.py --force-extract      # re-extract even when facts_epN.json exists
 ```
+
+> Existing `outputs/facts_epN.json` files are validated and reused automatically.
+> Only new, changed, or `--force-extract` episodes call the LLM.
 
 ### Individual stages
 
@@ -274,6 +280,28 @@ The Streamlit app is smoke-tested with `st.testing.v1.AppTest` (no browser neede
 ```
 
 ---
+
+## Why runs can be slow
+
+- **LLM latency dominates.** The default model is a large free OpenRouter model;
+  a single call commonly takes 10–60 seconds, and free tiers can queue or
+  rate-limit.
+- **Extraction is one call per episode.** A first run over 50 episodes therefore
+  needs ~50 calls. This is the main cost.
+- **Existing facts are now reused.** `outputs/facts_epN.json` is validated and
+  skipped on later runs, so only missing/changed episodes call the LLM. Use
+  `--force-extract` only after changing prompts or scripts.
+- **Judgments are cached by prompt.** Re-running `judge.py` with the same
+  candidates is instant.
+- **The Streamlit app executes stages as subprocesses.** It captures each stage's
+  output and reports when the stage finishes, so a long extraction looks quiet
+  until it returns.
+- **Hosted Streamlit sleeps when idle.** The first load after inactivity can take
+  ~30 seconds for the app to wake up.
+
+Speed options: run a few episodes first (`--eps 1 2 3`), switch
+`continuity/config.yaml` to a faster paid model, or run extraction in batches
+overnight and keep the resulting `facts_epN.json` files.
 
 ## Tech stack
 

@@ -40,6 +40,9 @@ python -m continuity.extract --eps 1 2 3
 ```
 
 - One LLM call per episode using `prompts/extract.txt`.
+- Reuses `outputs/facts_epN.json` when its quotes still verify against the
+  screenplay, so repeated runs skip the LLM for unchanged episodes. Pass
+  `--force` to re-extract.
 - Drops any fact whose quote is not a case/whitespace-insensitive verbatim
   substring of that episode's screenplay text.
 - Rejects section labels (`Episode N`, `Timeline`, etc.) as entities.
@@ -92,14 +95,23 @@ Verdicts: `real_error`, `legit_change`, `deception`, `unclear`.
 ## One-click pipeline
 
 ```bash
-python run_all.py                    # all episodes found in continuity/data or data/
+python run_all.py                    # extract only episodes without usable cached facts
 python run_all.py --eps 1 2 3
 python run_all.py --skip-parse
 python run_all.py --skip-extract
 python run_all.py --rebuild-aliases
+python run_all.py --force-extract    # re-extract even when facts_epN.json exists
 ```
 
 `python -m continuity.run_all` is equivalent.
+
+### Why a first run is slow
+
+The default model is a large free OpenRouter model; one call can take 10–60
+seconds and free tiers may queue or rate-limit. Extraction is one call per
+episode, so a first pass over 50 episodes needs ~50 calls. Later runs reuse
+`outputs/facts_epN.json` and skip the LLM for unchanged episodes. Judge calls are
+cached by prompt, so re-judging identical candidates is instant.
 
 ---
 

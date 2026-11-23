@@ -1250,7 +1250,16 @@ def render_upload_tab() -> None:
 
     # Stage 2: Extract (per episode or all)
     with st.expander("**Stage 2 · Extract Facts** — Run LLM fact extraction per episode"):
-        st.caption("`extract.py` calls the LLM for each episode → `outputs/facts_epN.json`")
+        st.caption(
+            "`extract.py` reuses `outputs/facts_epN.json` when its quotes still verify, "
+            "so only new or changed episodes call the LLM."
+        )
+        force_extract = st.checkbox(
+            "Re-extract existing facts",
+            value=False,
+            help="Ignore cached facts_epN.json files and call the LLM again. "
+                 "Only needed after changing the extraction prompt or scripts.",
+        )
         c_ep, c_all = st.columns([2, 1])
         with c_ep:
             ep_nums_available = sorted(
@@ -1277,12 +1286,15 @@ def render_upload_tab() -> None:
                 for ep_n in targets:
                     st.markdown(f"**Episode {ep_n}…**")
                     ph = st.empty()
-                    code, _ = _run_stage(
-                        [sys.executable, "-m", "continuity.extract", "--eps", str(ep_n)],
-                        ROOT, ph
-                    )
+                    cmd = [sys.executable, "-m", "continuity.extract", "--eps", str(ep_n)]
+                    if force_extract:
+                        cmd.append("--force")
+                    code, out = _run_stage(cmd, ROOT, ph)
                     if code == 0:
-                        st.success(f"✅ Ep {ep_n} extracted.")
+                        if "Using cached facts" in out:
+                            st.info(f"♻️ Ep {ep_n} reused cached facts (no LLM call).")
+                        else:
+                            st.success(f"✅ Ep {ep_n} extracted.")
                     else:
                         st.error(f"❌ Ep {ep_n} failed (exit {code})")
                 st.cache_data.clear()
@@ -1335,7 +1347,10 @@ def render_upload_tab() -> None:
     # Full pipeline shortcut
     st.markdown("<hr style='border-color:rgba(255,255,255,0.06);'>", unsafe_allow_html=True)
     st.markdown("### ⚡ Run Full Pipeline")
-    st.caption("Runs Parse → Extract (all eps) → Bible → Detect → Judge sequentially. May take several minutes.")
+    st.caption(
+        "Runs Parse → Extract (all eps) → Bible → Detect → Judge sequentially. "
+        "Existing facts are reused automatically; only new episodes call the LLM."
+    )
     if st.button("🚀 Run ALL Stages", type="primary", key="run_all"):
         stages = [
             ("Parse",   [sys.executable, "-m", "continuity.parse"]),
@@ -1357,20 +1372,30 @@ def render_upload_tab() -> None:
         )
         all_stages = [stages[0]]  # Parse first
         for ep_n in all_eps:
-            all_stages.append(
-                (f"Extract Ep {ep_n}", [sys.executable, "-m", "continuity.extract", "--eps", str(ep_n)])
-            )
+            extract_cmd = [
+                sys.executable,
+                "-m",
+                "continuity.extract",
+                "--eps",
+                str(ep_n),
+            ]
+            if force_extract:
+                extract_cmd.append("--force")
+            all_stages.append((f"Extract Ep {ep_n}", extract_cmd))
         all_stages += stages[1:]  # Bible, Detect, Judge
 
         progress = st.progress(0, text="Starting pipeline…")
         for i, (name, cmd) in enumerate(all_stages):
             st.markdown(f"**▶ {name}**")
             ph = st.empty()
-            code, _ = _run_stage(cmd, ROOT, ph)
+            code, out = _run_stage(cmd, ROOT, ph)
             if code != 0:
                 st.error(f"❌ Pipeline stopped at **{name}** (exit {code}). Fix the error and retry.")
                 break
-            st.success(f"✅ {name} done")
+            if "Using cached facts" in out:
+                st.info(f"♻️ {name} reused cached facts")
+            else:
+                st.success(f"✅ {name} done")
             progress.progress((i + 1) / len(all_stages), text=f"Completed: {name}")
         else:
             st.balloons()

@@ -149,13 +149,84 @@ def validate_and_filter_facts(raw_facts: List[Dict[str, Any]], raw_screenplay: s
     return verified, dropped_count
 
 
-def extract_episode(ep_num: int, screenplay_path: Path) -> Dict[str, Any]:
+def _load_cached_episode_facts(
+    out_file: Path,
+    ep_num: int,
+    raw_screenplay: str,
+) -> Optional[Dict[str, Any]]:
+    """
+    Load an existing facts file if its quotes still verify against the script.
+
+    This is the per-episode cache that makes repeated pipeline runs fast. Returns
+    None when the file is missing, malformed, or stale, so the caller re-extracts.
+    """
+    if not out_file.exists():
+        return None
+
+    try:
+        with open(out_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as exc:
+        logger.warning(f"[Ep {ep_num}] Could not read cached facts {out_file.name}: {exc}")
+        return None
+
+    if not isinstance(data, dict) or not isinstance(data.get("facts"), list):
+        logger.warning(f"[Ep {ep_num}] Cached facts file has an unexpected schema; re-extracting.")
+        return None
+
+    if data.get("error"):
+        logger.warning(f"[Ep {ep_num}] Cached facts file records an error; re-extracting.")
+        return None
+
+    invalid = 0
+    for fact in data["facts"]:
+        if not isinstance(fact, dict) or not is_quote_in_screenplay(
+            str(fact.get("quote", "")), raw_screenplay
+        ):
+            invalid += 1
+
+    if invalid:
+        logger.warning(
+            "[Ep %d] Cached facts contain %d unverifiable quote(s); re-extracting.",
+            ep_num,
+            invalid,
+        )
+        return None
+
+    data["episode"] = ep_num
+    data["facts_count"] = len(data["facts"])
+    data.setdefault("dropped_count", 0)
+    data["cached"] = True
+    return data
+
+
+def extract_episode(
+    ep_num: int,
+    screenplay_path: Path,
+    force: bool = False,
+) -> Dict[str, Any]:
     """
     Extracts facts for a single episode, validates, filters, and saves output.
+
+    Args:
+        ep_num: Episode number.
+        screenplay_path: Source screenplay file.
+        force: Ignore an existing ``outputs/facts_epN.json`` and call the LLM.
     """
     logger.info(f"Processing Episode {ep_num} from {screenplay_path.name}...")
     with open(screenplay_path, "r", encoding="utf-8", errors="replace") as f:
         raw_screenplay = f.read()
+
+    out_file = OUTPUTS_DIR / f"facts_ep{ep_num}.json"
+    if not force:
+        cached = _load_cached_episode_facts(out_file, ep_num, raw_screenplay)
+        if cached is not None:
+            logger.info(
+                "[Ep %d] Using cached facts (%d facts). Pass --force to re-extract.",
+                ep_num,
+                cached["facts_count"],
+            )
+            return cached
 
     prompt = load_extract_prompt(ep_num, raw_screenplay)
 
@@ -191,11 +262,11 @@ def extract_episode(ep_num: int, screenplay_path: Path) -> Dict[str, Any]:
         "facts_count": len(verified_facts),
         "dropped_count": dropped_count,
         "facts": verified_facts,
+        "cached": False,
     }
 
     # Save outputs/facts_epN.json
     OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
-    out_file = OUTPUTS_DIR / f"facts_ep{ep_num}.json"
     with open(out_file, "w", encoding="utf-8") as f:
         json.dump(output_data, f, indent=2, ensure_ascii=False)
 
@@ -240,6 +311,11 @@ def main():
         type=int,
         help="Specific episode numbers to process, e.g. --eps 1 2 3",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Re-extract even when outputs/facts_epN.json already exists",
+    )
     args = parser.parse_args()
 
     # Determine which episodes to run
@@ -259,6 +335,8 @@ def main():
 
     total_verified = 0
     total_dropped = 0
+    cached_episodes = 0
+    extracted_episodes = 0
 
     for ep_num in target_episodes:
         screenplay_path = find_screenplay_file(ep_num)
@@ -266,14 +344,20 @@ def main():
             logger.warning(f"Could not find screenplay file for Episode {ep_num}. Skipping.")
             continue
 
-        result = extract_episode(ep_num, screenplay_path)
+        result = extract_episode(ep_num, screenplay_path, force=args.force)
         total_verified += result["facts_count"]
         total_dropped += result["dropped_count"]
+        if result.get("cached"):
+            cached_episodes += 1
+        elif not result.get("error"):
+            extracted_episodes += 1
 
     print("\n" + "=" * 60)
     print("🎬 EXTRACTION COMPLETED")
     print("=" * 60)
     print(f"  Episodes processed : {len(target_episodes)}")
+    print(f"  From cache         : {cached_episodes}")
+    print(f"  Freshly extracted  : {extracted_episodes}")
     print(f"  Verified facts     : {total_verified}")
     print(f"  Dropped non-quotes : {total_dropped}")
     print(f"  Output directory   : {OUTPUTS_DIR}")
